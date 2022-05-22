@@ -1,0 +1,22 @@
+open questions
+    - versioning with sqlite?
+    - or rather: versioning via hand-crafted database scheme?
+
+what do we need?
+    - sqlite interface
+    - webserver with auth
+    - proxy logic
+    - database format
+
+web server
+    - actix-web
+    - need to test whether CORS works for a server on a different port/host?
+        -> if so, it means that we can mix the rust standalone and the C# UI
+
+Scraping
+    ITSF:
+        - Images: https://media.fast4foos.org/photos/players/[NUMBER].jpg
+        - can scrape world rankings by season: https://www.tablesoccer.org/page/player?tour=[YEAR]&numlic=[NUMBER]
+    BuLi:
+        - can probably just scrape the DTFL website? or maybe get some info from DTFB?
+        
