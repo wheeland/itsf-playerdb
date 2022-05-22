@@ -5,5 +5,7 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.0.0"
+actix-web-httpauth = "0.6.0"
 env_logger = "0.9.0"
 log = "0.4.17"
+maud = "0.23.0"

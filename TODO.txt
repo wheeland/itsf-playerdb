@@ -13,10 +13,14 @@ web server
     - need to test whether CORS works for a server on a different port/host?
         -> if so, it means that we can mix the rust standalone and the C# UI
 
+rendering HTML
+    - server-side: "HTML templating", e.g. https://maud.lambda.xyz/control-structures.html
+    - client-side: Seed/Yew
+
 Scraping
     ITSF:
         - Images: https://media.fast4foos.org/photos/players/[NUMBER].jpg
         - can scrape world rankings by season: https://www.tablesoccer.org/page/player?tour=[YEAR]&numlic=[NUMBER]
     BuLi:
         - can probably just scrape the DTFL website? or maybe get some info from DTFB?
-        
+
