@@ -20,7 +20,6 @@ rendering HTML
 Scraping
     ITSF:
         - Images: https://media.fast4foos.org/photos/players/[NUMBER].jpg
-        - can scrape world rankings by season: https://www.tablesoccer.org/page/player?tour=[YEAR]&numlic=[NUMBER]
     BuLi:
         - can probably just scrape the DTFL website? or maybe get some info from DTFB?
 
