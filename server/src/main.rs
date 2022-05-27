@@ -1,15 +1,15 @@
 #[macro_use]
 extern crate diesel;
 extern crate dotenv;
+extern crate r2d2;
 
 use std::sync::Mutex;
 use actix_web::{web, App, middleware::Logger, HttpResponse, HttpServer, Error, Responder, HttpRequest};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use diesel::prelude::*;
-use diesel::r2d2::{self, ConnectionManager};
 use log::{debug, trace, info, warn, error};
 
-type SqliteDbPool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+type SqliteDbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
 mod models;
 mod schema;
@@ -30,7 +30,8 @@ async fn hello(
     // use web::block to offload blocking Diesel code without blocking server thread
     let player = web::block(move || {
         let conn = data.db_pool.get()?;
-        queries::get_player(&conn, &itsf_lic)
+        let ok: Result<Option<models::Player>, r2d2::Error> = Ok(queries::get_player(&conn, &itsf_lic));
+        ok
     })
     .await?
     .map_err(actix_web::error::ErrorInternalServerError)?;
@@ -57,7 +58,7 @@ async fn main() -> std::io::Result<()> {
 
     // Open SQLite database pool
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
-    let db_manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let db_manager = diesel::r2d2::ConnectionManager::<SqliteConnection>::new(database_url);
     let db_pool = r2d2::Pool::builder()
         .build(db_manager)
         .expect("Failed to create R2D2 pool.");
