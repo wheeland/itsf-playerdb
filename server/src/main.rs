@@ -3,17 +3,19 @@ extern crate diesel;
 extern crate dotenv;
 extern crate r2d2;
 
-use std::sync::Mutex;
-use actix_web::{web, App, middleware::Logger, HttpResponse, HttpServer, Error, Responder, HttpRequest};
+use actix_web::{
+    middleware::Logger, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
+};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use diesel::prelude::*;
-use log::{debug, trace, info, warn, error};
+use log::{debug, error, info, trace, warn};
+use std::sync::Mutex;
 
 type SqliteDbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
 mod models;
-mod schema;
 mod queries;
+mod schema;
 
 struct AppState {
     name: Mutex<String>,
@@ -26,11 +28,12 @@ async fn hello(
     itsf_lic: web::Path<String>,
 ) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
-    
+
     // use web::block to offload blocking Diesel code without blocking server thread
     let player = web::block(move || {
         let conn = data.db_pool.get()?;
-        let ok: Result<Option<models::Player>, r2d2::Error> = Ok(queries::get_player(&conn, &itsf_lic));
+        let ok: Result<Option<models::Player>, r2d2::Error> =
+            Ok(queries::get_player(&conn, &itsf_lic));
         ok
     })
     .await?
@@ -48,7 +51,8 @@ async fn hello(
 
 #[actix_web::get("/img")]
 async fn img() -> impl Responder {
-    HttpResponse::Ok().body("<html><body><img src=\"http://localhost:8000/k36.jpg\"/></body></html>")
+    HttpResponse::Ok()
+        .body("<html><body><img src=\"http://localhost:8000/k36.jpg\"/></body></html>")
 }
 
 #[actix_web::main]
@@ -63,12 +67,10 @@ async fn main() -> std::io::Result<()> {
         .build(db_manager)
         .expect("Failed to create R2D2 pool.");
 
-    let state = web::Data::new(
-        AppState {
-            name: Mutex::new("thy app".to_string()),
-            db_pool,
-        }
-    );
+    let state = web::Data::new(AppState {
+        name: Mutex::new("thy app".to_string()),
+        db_pool,
+    });
 
     log::info!("Starting HTTP server at http://localhost:8080");
 

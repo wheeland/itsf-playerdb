@@ -1,10 +1,7 @@
 use scraper::Html;
 
 async fn get(url: &str) -> Result<String, reqwest::Error> {
-    Ok(reqwest::get(url)
-        .await?
-        .text()
-        .await?)
+    Ok(reqwest::get(url).await?.text().await?)
 }
 
 pub async fn download(url: &str) -> Result<Html, String> {

@@ -1,12 +1,14 @@
-use scraper::{Selector, ElementRef};
 use crate::download::download;
+use scraper::{ElementRef, Selector};
 
-fn get_player_from_div(div: &ElementRef) -> Result<(u32, String),&'static str> {
+fn get_player_from_div(div: &ElementRef) -> Result<(u32, String), &'static str> {
     let id = div.value().attr("id").ok_or("no id attr")?;
     let onclick = div.value().attr("onclick").ok_or("no onclick attr")?;
 
     let place = if id.starts_with("place") {
-        id[5..].parse::<u32>().map_err(|_| "can't parse place attr")?
+        id[5..]
+            .parse::<u32>()
+            .map_err(|_| "can't parse place attr")?
     } else {
         Err("id attr has no place")?
     };
@@ -15,7 +17,10 @@ fn get_player_from_div(div: &ElementRef) -> Result<(u32, String),&'static str> {
         let mut parts = onclick.split("&numlic=");
         parts.next().ok_or("onclick doesn't contain player link")?;
         let license = parts.next().ok_or("onclick doesn't contain player link")?;
-        license.split("&").next().ok_or("doesn't contain player link")?
+        license
+            .split("&")
+            .next()
+            .ok_or("doesn't contain player link")?
     } else {
         Err("onclick doesn't contain player link")?
     };
@@ -49,10 +54,7 @@ pub async fn get_itsf_rankings(year: u32, ranking: ItsfRanking) -> Result<Vec<Pl
     let div_selector = Selector::parse("div").unwrap();
     for div in itsf.select(&div_selector) {
         if let Ok((place, lic)) = get_player_from_div(&div) {
-            ret.push(Placement {
-                place,
-                lic,
-            });
+            ret.push(Placement { place, lic });
         }
     }
 

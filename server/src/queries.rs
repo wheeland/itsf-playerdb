@@ -1,9 +1,6 @@
 use diesel::prelude::*;
 
 use crate::models;
-use crate::schema;
-
-type DbError = Box<dyn std::error::Error + Send + Sync>;
 
 fn expect_result<T>(result: Result<T, diesel::result::Error>) -> T {
     match result {
