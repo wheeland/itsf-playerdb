@@ -22,22 +22,36 @@ struct AppState {
     db_pool: SqliteDbPool,
 }
 
+impl AppState {
+    async fn execute_db_operation<F, R>(
+        data: web::Data<AppState>,
+        f: F,
+    ) -> Result<R, actix_web::Error>
+    where
+        F: FnOnce(&SqliteConnection) -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        // use web::block to offload blocking Diesel code without blocking server thread
+        web::block(move || {
+            let conn = data.db_pool.get()?;
+            let result: Result<R, r2d2::Error> = Ok(f(&conn));
+            result
+        })
+        .await?
+        .map_err(actix_web::error::ErrorInternalServerError)
+    }
+}
+
 #[actix_web::get("/player/{itsf_lic}")]
 async fn hello(
     data: web::Data<AppState>,
-    itsf_lic: web::Path<String>,
+    itsf_lic: web::Path<i32>,
 ) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
-    // use web::block to offload blocking Diesel code without blocking server thread
-    let player = web::block(move || {
-        let conn = data.db_pool.get()?;
-        let ok: Result<Option<models::Player>, r2d2::Error> =
-            Ok(queries::get_player(&conn, &itsf_lic));
-        ok
-    })
-    .await?
-    .map_err(actix_web::error::ErrorInternalServerError)?;
+    let player =
+        AppState::execute_db_operation(data, move |conn| queries::get_player(conn, itsf_lic))
+            .await?;
 
     let json = match player {
         None => "{ \"error\": \"No player found\" }".into(),
@@ -45,6 +59,37 @@ async fn hello(
             let json = serde_json::to_string(&player).unwrap();
             format!("{{ \"data\": {} }}", json)
         }
+    };
+    Ok(HttpResponse::Ok().body(json))
+}
+
+#[actix_web::get("/addplayer/{itsf_lic}/{first_name}/{last_name}")]
+async fn add_player(
+    data: web::Data<AppState>,
+    itsf_lic: web::Path<(i32, String, String)>,
+) -> Result<HttpResponse, Error> {
+    let (itsf_lic, first_name, last_name) = itsf_lic.into_inner();
+
+    let ok = AppState::execute_db_operation(data, move |conn| {
+        queries::add_player(
+            &conn,
+            models::NewPlayer {
+                itsf_id: itsf_lic,
+                first_name: &first_name,
+                last_name: &last_name,
+                dtfb_license: None,
+                birth_year: 1234,
+                country_code: Some("GER"),
+                category: Some("MEN"),
+            },
+        )
+    })
+    .await?;
+
+    let json = if ok {
+        "{ \"data\": true }"
+    } else {
+        "{ \"error\": \"player already exists\" }".into()
     };
     Ok(HttpResponse::Ok().body(json))
 }
@@ -79,6 +124,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .app_data(state.clone())
             .service(hello)
+            .service(add_player)
             .service(img)
     })
     .bind(("127.0.0.1", 8080))?
