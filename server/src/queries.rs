@@ -70,9 +70,9 @@ pub fn add_itsf_rankings(
         let rankings = place_to_itsf_lic
             .iter()
             .map(|place| models::ItsfRankingEntry {
-                itsf_ranking_id: place.1,
+                itsf_ranking_id: last_rowid,
                 place: place.0,
-                player_itsf_id: last_rowid,
+                player_itsf_id: place.1,
             })
             .collect::<Vec<models::ItsfRankingEntry>>();
 
