@@ -3,13 +3,9 @@ extern crate diesel;
 extern crate dotenv;
 extern crate r2d2;
 
-use actix_web::{
-    middleware::Logger, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder,
-};
-use actix_web_httpauth::extractors::basic::BasicAuth;
+use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer, Responder};
+//use actix_web_httpauth::extractors::basic::BasicAuth;
 use diesel::prelude::*;
-use log::{debug, error, info, trace, warn};
-use std::sync::Mutex;
 
 type SqliteDbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
 
@@ -18,7 +14,6 @@ mod queries;
 mod schema;
 
 struct AppState {
-    name: Mutex<String>,
     db_pool: SqliteDbPool,
 }
 
@@ -43,10 +38,7 @@ impl AppState {
 }
 
 #[actix_web::get("/player/{itsf_lic}")]
-async fn hello(
-    data: web::Data<AppState>,
-    itsf_lic: web::Path<i32>,
-) -> Result<HttpResponse, Error> {
+async fn hello(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
     let player =
@@ -73,14 +65,14 @@ async fn add_player(
     let ok = AppState::execute_db_operation(data, move |conn| {
         queries::add_player(
             &conn,
-            models::NewPlayer {
+            models::Player {
                 itsf_id: itsf_lic,
-                first_name: &first_name,
-                last_name: &last_name,
+                first_name: first_name,
+                last_name: last_name,
                 dtfb_license: None,
                 birth_year: 1234,
-                country_code: Some("GER"),
-                category: Some("MEN"),
+                country_code: Some("GER".into()),
+                category: Some("MEN".into()),
             },
         )
     })
@@ -112,10 +104,16 @@ async fn main() -> std::io::Result<()> {
         .build(db_manager)
         .expect("Failed to create R2D2 pool.");
 
-    let state = web::Data::new(AppState {
-        name: Mutex::new("thy app".to_string()),
-        db_pool,
-    });
+    let state = web::Data::new(AppState { db_pool });
+
+    let ok = AppState::execute_db_operation(state.clone(), move |conn| {
+        let d = chrono::NaiveDate::from_ymd(2015, 6, 3);
+        let t = chrono::NaiveTime::from_hms_milli(12, 34, 56, 789);
+        let dt = chrono::NaiveDateTime::new(d, t);
+
+        queries::add_itsf_rankings(&conn, 2012, dt, None, &[(1, 2), (3, 4)]);
+    })
+    .await;
 
     log::info!("Starting HTTP server at http://localhost:8080");
 
