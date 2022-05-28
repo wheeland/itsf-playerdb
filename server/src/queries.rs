@@ -43,7 +43,8 @@ pub fn add_itsf_rankings(
     conn: &SqliteConnection,
     year: i32,
     queried_at: chrono::NaiveDateTime,
-    category: Option<String>,
+    category: models::ItsfRankingCategory,
+    class: models::ItsfRankingClass,
     place_to_itsf_lic: &[(i32, i32)],
 ) -> bool {
     let result = conn.transaction::<bool, diesel::result::Error, _>(|| {
@@ -51,7 +52,8 @@ pub fn add_itsf_rankings(
             year,
             queried_at,
             count: place_to_itsf_lic.len() as i32,
-            category,
+            category: category.into(),
+            class: class.into(),
         };
 
         // add new itsf_rankings entry

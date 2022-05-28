@@ -72,7 +72,7 @@ async fn add_player(
                 dtfb_license: None,
                 birth_year: 1234,
                 country_code: Some("GER".into()),
-                category: Some("MEN".into()),
+                category: models::PlayerCategory::Men.into(),
             },
         )
     })
@@ -111,7 +111,14 @@ async fn main() -> std::io::Result<()> {
         let t = chrono::NaiveTime::from_hms_milli(12, 34, 56, 789);
         let dt = chrono::NaiveDateTime::new(d, t);
 
-        queries::add_itsf_rankings(&conn, 2012, dt, None, &[(1, 2), (3, 4)]);
+        queries::add_itsf_rankings(
+            &conn,
+            2012,
+            dt,
+            models::ItsfRankingCategory::Men,
+            models::ItsfRankingClass::Doubles,
+            &[(1, 2), (3, 4)],
+        );
     })
     .await;
 

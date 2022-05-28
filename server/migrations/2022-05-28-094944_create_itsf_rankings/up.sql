@@ -3,7 +3,8 @@ CREATE TABLE itsf_rankings (
     year INTEGER NOT NULL,
 	queried_at DATETIME NOT NULL,
 	count INTEGER NOT NULL,
-	category CHAR(10)
+	category INTEGER NOT NULL,
+	class INTEGER NOT NULL
 );
 
 CREATE TABLE itsf_ranking_entries (

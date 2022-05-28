@@ -5,5 +5,5 @@ CREATE TABLE players (
 	dtfb_license TEXT,
 	birth_year INTEGER NOT NULL,
 	country_code CHAR(10),
-	category CHAR(10)
+	category INTEGER NOT NULL
 )

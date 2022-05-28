@@ -12,7 +12,8 @@ table! {
         year -> Integer,
         queried_at -> Timestamp,
         count -> Integer,
-        category -> Nullable<Text>,
+        category -> Integer,
+        class -> Integer,
     }
 }
 
@@ -24,7 +25,7 @@ table! {
         dtfb_license -> Nullable<Text>,
         birth_year -> Integer,
         country_code -> Nullable<Text>,
-        category -> Nullable<Text>,
+        category -> Integer,
     }
 }
 
