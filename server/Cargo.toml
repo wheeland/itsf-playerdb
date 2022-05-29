@@ -11,6 +11,7 @@ log = "0.4.17"
 maud = "0.23.0"
 libsqlite3-sys = { version = "^0", features = ["bundled"] }
 diesel = { version = "1.4.8", features = ["sqlite", "r2d2", "chrono"] }
+futures-util = "0.3.21"
 r2d2 = "^0"
 chrono = "^0"
 dotenv = "0.15.0"

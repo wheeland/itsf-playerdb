@@ -29,8 +29,4 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(
-    itsf_ranking_entries,
-    itsf_rankings,
-    players,
-);
+allow_tables_to_appear_in_same_query!(itsf_ranking_entries, itsf_rankings, players,);

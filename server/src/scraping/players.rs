@@ -1,5 +1,3 @@
-use std::io::BufRead;
-
 use super::download;
 use crate::models;
 use scraper::{ElementRef, Html, Selector};
@@ -43,14 +41,14 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
 
     let last_name = name
         .split(" ")
-        .filter(|word| is_uppercase(word))
+        .filter(|word| !word.is_empty() && is_uppercase(word))
         .map(to_normalcase)
         .collect::<Vec<String>>()
         .join(" ");
 
     let first_name = name
         .split(" ")
-        .filter(|word| !is_uppercase(word))
+        .filter(|word| !word.is_empty() && !is_uppercase(word))
         .collect::<Vec<&str>>()
         .join(" ");
 
@@ -92,7 +90,8 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
     let category = contenu_typeinfojoueur_even[0]
         .text()
         .next()
-        .ok_or("can't find category text")?;
+        .ok_or("can't find category text")?
+        .trim();
     let category = match category {
         "MEN" => Ok(models::PlayerCategory::Men),
         "WOMEN" => Ok(models::PlayerCategory::Women),
@@ -100,19 +99,22 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
         "JUNIOR FEMALE" => Ok(models::PlayerCategory::JuniorFemale),
         "SENIOR MALE" => Ok(models::PlayerCategory::SeniorMale),
         "SENIOR FEMALE" => Ok(models::PlayerCategory::SeniorFemale),
-        _ => Err(format!("invalid category: {}", category)),
+        _ => Err(format!("invalid category: '{}'", category)),
     }?;
 
     let birth_year = contenu_typeinfojoueur[1]
         .text()
         .next()
         .ok_or("can't find birth year")?;
-    let birth_year = birth_year
-        .parse::<i32>()
-        .unwrap_or_else(|err| {
-            log::error!("{}: can't parse birth year '{}': {:?}", url, birth_year, err);
-            0
-        });
+    let birth_year = birth_year.parse::<i32>().unwrap_or_else(|err| {
+        log::error!(
+            "{}: can't parse birth year '{}': {:?}",
+            url,
+            birth_year,
+            err
+        );
+        0
+    });
 
     Ok(models::Player {
         itsf_id,

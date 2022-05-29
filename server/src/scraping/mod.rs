@@ -2,11 +2,12 @@ use std::sync::{Arc, Weak};
 
 use crate::{
     background::BackgroundOperationProgress,
-    models::{ItsfRankingCategory, ItsfRankingClass},
+    models::{ItsfRankingCategory, ItsfRankingClass, PlayerCategory},
     queries,
 };
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::Utc;
 use diesel::{prelude::*, r2d2::ConnectionManager};
+use futures_util::future::join_all;
 use r2d2::PooledConnection;
 
 mod download;
@@ -28,7 +29,7 @@ async fn do_itsf_rankings_download(
     );
     let rankings = itsf_rankings::download(year, category, class, 100).await?;
 
-    let missing_players: Vec<i32> = rankings
+    let mut missing_players: Vec<i32> = rankings
         .iter()
         .filter_map(|entry| match queries::get_player(&conn, entry.1) {
             None => Some(entry.1),
@@ -43,18 +44,30 @@ async fn do_itsf_rankings_download(
     ));
     progress.set_progress(1, missing_players.len() + 1);
 
-    for missing_player in missing_players.iter().enumerate() {
-        let player = players::download_player_info(*missing_player.1).await?;
-        progress.log(format!(
-            "Downloaded player info for {}, {}",
-            player.last_name, player.first_name
-        ));
-        queries::add_player(&conn, player);
-        progress.set_progress(missing_player.0 + 1, missing_players.len() + 1);
+    // query players in sets of N, to hide ITSF server latency
+    const MAX_CONCURRENT: usize = 10;
+    while missing_players.len() >= MAX_CONCURRENT {
+        let mut futures = Vec::new();
+        for _ in 0..MAX_CONCURRENT {
+            futures.push(players::download_player_info(
+                missing_players.pop().unwrap(),
+            ));
+        }
+        
+        for player in join_all(futures).await {
+            let player = player?;
+            progress.log(format!(
+                "Downloaded player info for {}: {} {} ({:?}, {:?})",
+                player.itsf_id, player.first_name, player.last_name, PlayerCategory::try_from(player.category).unwrap(), player.country_code
+            ));
+            queries::add_player(&conn, player);
+        }
     }
 
     let queried_at = Utc::now().naive_utc();
     queries::add_itsf_rankings(&conn, year, queried_at, category, class, &rankings);
+
+    progress.set_progress(1, 1);
 
     Ok(())
 }

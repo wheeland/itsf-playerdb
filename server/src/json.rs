@@ -10,10 +10,10 @@ struct JsonErr<T: serde::Serialize> {
 
 pub fn ok<T: serde::Serialize>(data: T) -> String {
     let ok = JsonOk { data };
-    serde_json::to_string(&ok).unwrap()
+    serde_json::to_string_pretty(&ok).unwrap()
 }
 
 pub fn err<T: serde::Serialize>(error: T) -> String {
     let err = JsonErr { error };
-    serde_json::to_string(&err).unwrap()
+    serde_json::to_string_pretty(&err).unwrap()
 }
