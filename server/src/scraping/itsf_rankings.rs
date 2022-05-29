@@ -35,6 +35,7 @@ pub async fn download(
     year: i32,
     category: ItsfRankingCategory,
     class: ItsfRankingClass,
+    count: usize,
 ) -> Result<Vec<(i32, i32)>, String> {
     let category = match category {
         ItsfRankingCategory::Open => "o",
@@ -47,7 +48,7 @@ pub async fn download(
         ItsfRankingClass::Doubles => "d",
         ItsfRankingClass::Combined => "c",
     };
-    let url = format!("https://www.tablesoccer.org/page/rankings?category={}{}&system=1&Ranking+Rules=Select+Category&tour={}&vues=1000", category, class, year);
+    let url = format!("https://www.tablesoccer.org/page/rankings?category={}{}&system=1&Ranking+Rules=Select+Category&tour={}&vues={}", category, class, year, count);
     let itsf = download::download(&url).await?;
 
     let mut ret = Vec::new();
