@@ -47,20 +47,31 @@ async fn do_itsf_rankings_download(
     // query players in sets of N, to hide ITSF server latency
     const MAX_CONCURRENT: usize = 10;
     while missing_players.len() >= MAX_CONCURRENT {
-        let mut futures = Vec::new();
+        let mut player_futures = Vec::new();
+        let mut image_futures = Vec::new();
         for _ in 0..MAX_CONCURRENT {
-            futures.push(players::download_player_info(
-                missing_players.pop().unwrap(),
-            ));
+            let itsf_id = missing_players.pop().unwrap();
+            player_futures.push(players::download_player_info(itsf_id));
+            image_futures.push(players::download_player_image(itsf_id));
         }
-        
-        for player in join_all(futures).await {
+
+        for player in join_all(player_futures).await {
             let player = player?;
             progress.log(format!(
                 "Downloaded player info for {}: {} {} ({:?}, {:?})",
-                player.itsf_id, player.first_name, player.last_name, PlayerCategory::try_from(player.category).unwrap(), player.country_code
+                player.itsf_id,
+                player.first_name,
+                player.last_name,
+                PlayerCategory::try_from(player.category).unwrap(),
+                player.country_code
             ));
             queries::add_player(&conn, player);
+        }
+
+        for image in join_all(image_futures).await {
+            if let Some(image) = image? {
+                queries::add_player_image(&conn, image);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 use super::download;
 use crate::models;
+use reqwest::StatusCode;
 use scraper::{ElementRef, Html, Selector};
 
 fn get_div_with_class<'a>(root: &'a Html, class: &'static str) -> Vec<ElementRef<'a>> {
@@ -52,7 +53,10 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
         .collect::<Vec<&str>>()
         .join(" ");
 
-    // TODO: this only seems to work for ASCII. we need to figure out a way to properly parse UTF.
+    // TODO:
+    // it looks like we're receiving and storing these things in UTF-8, which should
+    // be fine with JSON, which is UTF-compliant by definition.
+    // however, how will this work on the client side? we might need to encode this UTF in ASCII!
 
     let span_selector = Selector::parse("span").unwrap();
     let country_code = nomdujoueur
@@ -132,4 +136,33 @@ pub async fn download_player_info(itsf_id: i32) -> Result<models::Player, String
     download_player_info_from(itsf_id, &url)
         .await
         .map_err(|msg| format!("Player[{}]: {}", url, msg))
+}
+
+pub async fn download_player_image(itsf_id: i32) -> Result<Option<models::PlayerImage>, String> {
+    let url = format!("https://media.fast4foos.org/photos/players/{}.jpg", itsf_id);
+
+    let response = match reqwest::get(url).await {
+        Ok(response) => {
+            if response.status() == StatusCode::NOT_FOUND {
+                return Ok(None);
+            }
+            response
+        }
+        Err(err) => {
+            if let Some(status) = err.status() {
+                if status == StatusCode::NOT_FOUND {
+                    return Ok(None);
+                }
+            }
+            return Err(err.to_string());
+        }
+    };
+
+    let bytes = response.bytes().await.map_err(|err| err.to_string())?;
+
+    Ok(Some(models::PlayerImage {
+        itsf_id,
+        image_data: bytes.to_vec(),
+        image_format: Some(String::from("jpg")),
+    }))
 }

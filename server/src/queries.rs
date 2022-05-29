@@ -39,6 +39,31 @@ pub fn add_player(conn: &SqliteConnection, new_player: models::Player) -> bool {
     }
 }
 
+pub fn get_player_image(conn: &SqliteConnection, itsf_lic: i32) -> Option<models::PlayerImage> {
+    use schema::player_images::dsl::*;
+
+    let players = player_images
+        .filter(itsf_id.eq(itsf_lic))
+        .first::<models::PlayerImage>(conn)
+        .optional();
+
+    expect_result(players)
+}
+
+pub fn add_player_image(conn: &SqliteConnection, new_image: models::PlayerImage) -> bool {
+    use schema::player_images::dsl::*;
+
+    let result = diesel::insert_or_ignore_into(player_images)
+        .values(new_image)
+        .execute(conn);
+
+    match expect_result(result) {
+        0 => false,
+        1 => true,
+        _ => panic!("invalid query result for player image insert"),
+    }
+}
+
 pub fn add_itsf_rankings(
     conn: &SqliteConnection,
     year: i32,

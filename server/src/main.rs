@@ -5,7 +5,7 @@ extern crate r2d2;
 
 use std::sync::Weak;
 
-use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{http::header, middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use diesel::prelude::*;
 use models::{ItsfRankingCategory, ItsfRankingClass};
 use std::sync::Mutex;
@@ -45,18 +45,38 @@ impl AppState {
 }
 
 #[actix_web::get("/player/{itsf_lic}")]
-async fn hello(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<HttpResponse, Error> {
+async fn get_player(
+    data: web::Data<AppState>,
+    itsf_lic: web::Path<i32>,
+) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
     let player =
         AppState::execute_db_operation(data, move |conn| queries::get_player(conn, itsf_lic))
             .await?;
 
-    let json = match player {
-        None => json::err("no player found"),
-        Some(player) => json::ok(player),
-    };
-    Ok(HttpResponse::Ok().body(json))
+    match player {
+        None => Ok(HttpResponse::BadRequest().json(json::err("no player found"))),
+        Some(player) => Ok(HttpResponse::Ok().json(json::ok(player))),
+    }
+}
+
+#[actix_web::get("/image/{itsf_lic}.jpg")]
+async fn get_player_image(
+    data: web::Data<AppState>,
+    itsf_lic: web::Path<i32>,
+) -> Result<HttpResponse, Error> {
+    let itsf_lic = itsf_lic.into_inner();
+
+    let player =
+        AppState::execute_db_operation(data, move |conn| queries::get_player_image(conn, itsf_lic))
+            .await?;
+    match player {
+        Some(image) => Ok(HttpResponse::Ok()
+            .append_header(("Content-Type", "image/jpeg"))
+            .body(image.image_data)),
+        None => Ok(HttpResponse::NotFound().finish()),
+    }
 }
 
 #[actix_web::get("/download/{year}/{category}/{class}")]
@@ -67,7 +87,7 @@ async fn download_itsf(
     let year = if itsf_lic.0 > 2006 {
         itsf_lic.0
     } else {
-        return Ok(HttpResponse::BadRequest().body(json::err("Invalid year")));
+        return Ok(HttpResponse::BadRequest().json(json::err("Invalid year")));
     };
 
     let category = match itsf_lic.1.to_lowercase().as_str() {
@@ -76,7 +96,7 @@ async fn download_itsf(
         "senior" => ItsfRankingCategory::Senior,
         "junior" => ItsfRankingCategory::Junior,
         _ => {
-            return Ok(HttpResponse::BadRequest().body(json::err(
+            return Ok(HttpResponse::BadRequest().json(json::err(
                 "Invalid category. Must be one of ['open', 'women', 'senior', 'junior'].",
             )))
         }
@@ -87,7 +107,7 @@ async fn download_itsf(
         "doubles" => ItsfRankingClass::Singles,
         "combined" => ItsfRankingClass::Singles,
         _ => {
-            return Ok(HttpResponse::BadRequest().body(json::err(
+            return Ok(HttpResponse::BadRequest().json(json::err(
                 "Invalid class. Must be one of ['singles', 'doubles', 'combined'].",
             )))
         }
@@ -99,7 +119,7 @@ async fn download_itsf(
         .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
 
     if let Some(_) = itsf_ranking_download.upgrade() {
-        return Ok(HttpResponse::BadRequest().body(json::err("Ranking query still in progress")));
+        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
     let conn = data
@@ -108,7 +128,7 @@ async fn download_itsf(
         .map_err(actix_web::error::ErrorInternalServerError)?;
     *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, year, category, class);
 
-    Ok(HttpResponse::Ok().body(json::ok("Started download")))
+    Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
 
 #[actix_web::main]
@@ -135,7 +155,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .app_data(state.clone())
-            .service(hello)
+            .service(get_player)
+            .service(get_player_image)
             .service(download_itsf)
     })
     .bind(("127.0.0.1", 8080))?

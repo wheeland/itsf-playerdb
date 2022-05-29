@@ -1,1 +1,2 @@
--- This file should undo anything in `up.sql`
+DROP TABLE itsf_rankings;
+DROP TABLE itsf_ranking_entries;

@@ -23,6 +23,13 @@ pub struct Player {
     pub category: i32,
 }
 
+#[derive(Insertable, Queryable)]
+pub struct PlayerImage {
+    pub itsf_id: i32,
+    pub image_data: Vec<u8>,
+    pub image_format: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 pub enum ItsfRankingCategory {

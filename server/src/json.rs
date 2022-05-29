@@ -8,12 +8,12 @@ struct JsonErr<T: serde::Serialize> {
     error: T,
 }
 
-pub fn ok<T: serde::Serialize>(data: T) -> String {
+pub fn ok<T: serde::Serialize>(data: T) -> impl serde::Serialize {
     let ok = JsonOk { data };
-    serde_json::to_string_pretty(&ok).unwrap()
+    ok
 }
 
-pub fn err<T: serde::Serialize>(error: T) -> String {
+pub fn err<T: serde::Serialize>(error: T) -> impl serde::Serialize {
     let err = JsonErr { error };
-    serde_json::to_string_pretty(&err).unwrap()
+    err
 }

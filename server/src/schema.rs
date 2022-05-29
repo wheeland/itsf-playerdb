@@ -18,6 +18,14 @@ table! {
 }
 
 table! {
+    player_images (itsf_id) {
+        itsf_id -> Integer,
+        image_data -> Binary,
+        image_format -> Nullable<Text>,
+    }
+}
+
+table! {
     players (itsf_id) {
         itsf_id -> Integer,
         first_name -> Text,
@@ -29,4 +37,9 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(itsf_ranking_entries, itsf_rankings, players,);
+allow_tables_to_appear_in_same_query!(
+    itsf_ranking_entries,
+    itsf_rankings,
+    player_images,
+    players,
+);
