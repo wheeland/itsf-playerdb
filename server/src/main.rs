@@ -12,6 +12,7 @@ type SqliteDbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteCon
 mod models;
 mod queries;
 mod schema;
+mod scraping;
 
 struct AppState {
     db_pool: SqliteDbPool,
@@ -52,6 +53,18 @@ async fn hello(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<Ht
             format!("{{ \"data\": {} }}", json)
         }
     };
+
+    tokio::spawn(async move {
+        log::error!("hello thar");
+        let rankings = crate::scraping::itsf_rankings::download(
+            2020,
+            models::ItsfRankingCategory::Open,
+            models::ItsfRankingClass::Singles,
+        )
+        .await;
+        log::error!("done dat {:?}", rankings.map(|v| v.len()));
+    });
+
     Ok(HttpResponse::Ok().body(json))
 }
 
@@ -115,7 +128,7 @@ async fn main() -> std::io::Result<()> {
             &conn,
             2012,
             dt,
-            models::ItsfRankingCategory::Men,
+            models::ItsfRankingCategory::Open,
             models::ItsfRankingClass::Doubles,
             &[(1, 2), (3, 4)],
         );

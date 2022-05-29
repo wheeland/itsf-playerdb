@@ -26,7 +26,7 @@ pub struct Player {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 pub enum ItsfRankingCategory {
-    Men,
+    Open,
     Women,
     Junior,
     Senior,
