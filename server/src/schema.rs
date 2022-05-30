@@ -8,7 +8,7 @@ table! {
 
 table! {
     itsf_rankings (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         year -> Integer,
         queried_at -> Timestamp,
         count -> Integer,

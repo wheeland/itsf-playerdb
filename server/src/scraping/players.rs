@@ -124,14 +124,14 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
 }
 
 pub async fn download_player_info(itsf_id: i32) -> Result<models::Player, String> {
-    let url = format!("https://www.tablesoccer.org/page/player&numlic={}", itsf_id);
+    let url = format!("https://www.tablesoccer.org/page/player&numlic={:08}", itsf_id);
     download_player_info_from(itsf_id, &url)
         .await
         .map_err(|msg| format!("Player[{}]: {}", url, msg))
 }
 
 pub async fn download_player_image(itsf_id: i32) -> Result<Option<models::PlayerImage>, String> {
-    let url = format!("https://media.fast4foos.org/photos/players/{}.jpg", itsf_id);
+    let url = format!("https://media.fast4foos.org/photos/players/{:08}.jpg", itsf_id);
 
     let response = match reqwest::get(url).await {
         Ok(response) => {

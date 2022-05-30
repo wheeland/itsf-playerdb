@@ -125,11 +125,38 @@ pub struct PlayerItsfRanking {
     pub place: i32,
     pub year: i32,
     pub queried_at: chrono::NaiveDateTime,
-    pub category: Option<String>,
+    pub category: models::ItsfRankingCategory,
+    pub class: models::ItsfRankingClass,
 }
 
-impl PlayerItsfRanking {
-    pub fn get(conn: &SqliteConnection, itsf_lic: i32) -> Option<Vec<Self>> {
-        None
+pub fn get_itsf_rankings(conn: &SqliteConnection, itsf_lic: i32) -> Vec<PlayerItsfRanking> {
+    use schema::itsf_ranking_entries::dsl as entries;
+    use schema::itsf_rankings::dsl as rankings;
+
+    #[derive(Queryable)]
+    pub struct Ranking {
+        pub place: i32,
+        pub year: i32,
+        pub queried_at: chrono::NaiveDateTime,
+        pub category: i32,
+        pub class: i32,
     }
+
+    let result = entries::itsf_ranking_entries
+        .filter(entries::player_itsf_id.eq(itsf_lic))
+        .inner_join(rankings::itsf_rankings.on(entries::itsf_ranking_id.eq(rankings::id)))
+        .select((entries::place, rankings::year, rankings::queried_at, rankings::category, rankings::class))
+        .load::<Ranking>(conn);
+    let result = expect_result(result);
+
+    result
+        .iter()
+        .map(|ranking| PlayerItsfRanking {
+            place: ranking.place,
+            year: ranking.year,
+            queried_at: ranking.queried_at,
+            category: ranking.category.try_into().expect("invalid category data"),
+            class: ranking.class.try_into().expect("invalid category data"),
+        })
+        .collect()
 }

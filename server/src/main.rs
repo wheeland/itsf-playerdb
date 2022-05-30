@@ -50,10 +50,50 @@ async fn get_player(
     itsf_lic: web::Path<i32>,
 ) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
+    
+    #[derive(serde::Serialize)]
+    struct PlayerRankingJson {
+        year: i32,
+        place: i32,
+        category: String,
+        class: String,
+    }
 
-    let player =
-        AppState::execute_db_operation(data, move |conn| queries::get_player(conn, itsf_lic))
-            .await?;
+    #[derive(serde::Serialize)]
+    struct PlayerJson {
+        pub first_name: String,
+        pub last_name: String,
+        pub birth_year: i32,
+        pub country_code: String,
+        pub image_url: String,
+        pub itsf_rankings: Vec<PlayerRankingJson>,
+    }
+
+    let player = AppState::execute_db_operation(data, move |conn| {
+        let player = queries::get_player(conn, itsf_lic);
+        player.map(|player| {
+            let itsf_rankings = queries::get_itsf_rankings(conn, itsf_lic)
+                .iter()
+                .map(|ranking| {
+                    PlayerRankingJson {
+                        year: ranking.year,
+                        place: ranking.place,
+                        category: ranking.category.to_str().into(),
+                        class: ranking.class.to_str().into(),
+                    }
+                })
+                .collect();
+
+            PlayerJson {
+                first_name: player.first_name,
+                last_name: player.last_name,
+                birth_year: player.birth_year,
+                country_code: player.country_code.unwrap_or(String::new()),
+                image_url: format!("/image/{}.jpg", itsf_lic),
+                itsf_rankings,
+            }
+        })
+    }).await?;
 
     match player {
         None => Ok(HttpResponse::BadRequest().json(json::err("no player found"))),

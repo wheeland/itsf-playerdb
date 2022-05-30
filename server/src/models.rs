@@ -63,12 +63,33 @@ pub enum ItsfRankingCategory {
     Senior,
 }
 
+impl ItsfRankingCategory {
+    pub fn to_str(&self) -> &'static str {
+        match *self {
+            ItsfRankingCategory::Open => "open",
+            ItsfRankingCategory::Women => "women",
+            ItsfRankingCategory::Junior => "junior",
+            ItsfRankingCategory::Senior => "senior",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoPrimitive, TryFromPrimitive)]
 #[repr(i32)]
 pub enum ItsfRankingClass {
     Singles,
     Doubles,
     Combined,
+}
+
+impl ItsfRankingClass {
+    pub fn to_str(&self) -> &'static str {
+        match *self {
+            ItsfRankingClass::Singles => "singles",
+            ItsfRankingClass::Doubles => "doubles",
+            ItsfRankingClass::Combined => "combined",
+        }
+    }
 }
 
 #[derive(Insertable)]

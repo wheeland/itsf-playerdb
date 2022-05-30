@@ -22,7 +22,3 @@ Scraping
         - Images: https://media.fast4foos.org/photos/players/[NUMBER].jpg
     BuLi:
         - can probably just scrape the DTFL website? or maybe get some info from DTFB?
-
-STEPS
-    - think about DB schema, use Diesel to build an interface
-    - scrape some player info from ITSF
