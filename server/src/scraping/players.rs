@@ -96,15 +96,7 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
         .next()
         .ok_or("can't find category text")?
         .trim();
-    let category = match category {
-        "MEN" => Ok(models::PlayerCategory::Men),
-        "WOMEN" => Ok(models::PlayerCategory::Women),
-        "JUNIOR MALE" => Ok(models::PlayerCategory::JuniorMale),
-        "JUNIOR FEMALE" => Ok(models::PlayerCategory::JuniorFemale),
-        "SENIOR MALE" => Ok(models::PlayerCategory::SeniorMale),
-        "SENIOR FEMALE" => Ok(models::PlayerCategory::SeniorFemale),
-        _ => Err(format!("invalid category: '{}'", category)),
-    }?;
+    let category = models::PlayerCategory::try_from_str(category)?;
 
     let birth_year = contenu_typeinfojoueur[1]
         .text()

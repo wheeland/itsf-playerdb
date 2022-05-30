@@ -12,6 +12,30 @@ pub enum PlayerCategory {
     SeniorFemale,
 }
 
+impl PlayerCategory {
+    pub fn try_from_str(category: &str) -> Result<PlayerCategory, String> {
+        match category {
+            "MEN" => Ok(PlayerCategory::Men),
+            "WOMEN" => Ok(PlayerCategory::Women),
+            "JUNIOR MALE" => Ok(PlayerCategory::JuniorMale),
+            "JUNIOR FEMALE" => Ok(PlayerCategory::JuniorFemale),
+            "SENIOR MALE" => Ok(PlayerCategory::SeniorMale),
+            "SENIOR FEMALE" => Ok(PlayerCategory::SeniorFemale),
+            _ => Err(format!("invalid category: '{}'", category)),
+        }
+    }
+    pub fn to_str(&self) -> &'static str {
+        match *self {
+            PlayerCategory::Men => "MEN",
+            PlayerCategory::Women => "WOMEN",
+            PlayerCategory::JuniorMale => "JUNIOR MALE",
+            PlayerCategory::JuniorFemale => "JUNIOR FEMALE",
+            PlayerCategory::SeniorMale => "SENIOR MALE",
+            PlayerCategory::SeniorFemale => "SENIOR FEMALE",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Insertable, Queryable, serde::Serialize, serde::Deserialize)]
 pub struct Player {
     pub itsf_id: i32,
