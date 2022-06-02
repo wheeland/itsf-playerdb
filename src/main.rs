@@ -144,8 +144,8 @@ async fn download_itsf(
 
     let class = match itsf_lic.2.to_lowercase().as_str() {
         "singles" => ItsfRankingClass::Singles,
-        "doubles" => ItsfRankingClass::Singles,
-        "combined" => ItsfRankingClass::Singles,
+        "doubles" => ItsfRankingClass::Doubles,
+        "combined" => ItsfRankingClass::Combined,
         _ => {
             return Ok(HttpResponse::BadRequest().json(json::err(
                 "Invalid class. Must be one of ['singles', 'doubles', 'combined'].",
@@ -166,7 +166,31 @@ async fn download_itsf(
         .db_pool
         .get()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, year, category, class);
+    *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, vec![year], vec![category], vec![class]);
+
+    Ok(HttpResponse::Ok().json(json::ok("Started download")))
+}
+
+#[actix_web::get("/download_all")]
+async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    let mut itsf_ranking_download = data
+        .itsf_ranking_download
+        .lock()
+        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
+
+    if let Some(_) = itsf_ranking_download.upgrade() {
+        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
+    }
+
+    let conn = data
+        .db_pool
+        .get()
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    let years = (2010..2022).collect();
+    let categories = vec![ItsfRankingCategory::Open, ItsfRankingCategory::Women, ItsfRankingCategory::Senior, ItsfRankingCategory::Junior];
+    let classes = vec![ItsfRankingClass::Singles, ItsfRankingClass::Doubles, ItsfRankingClass::Combined];
+    *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, years, categories, classes);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
