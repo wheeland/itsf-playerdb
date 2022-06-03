@@ -59,16 +59,17 @@ async fn do_itsf_rankings_downloads(
                     }
 
                     for player in join_all(player_futures).await {
-                        let player = player?;
-                        progress.log(format!(
-                            "Downloaded player info for {}: {} {} ({:?}, {:?})",
-                            player.itsf_id,
-                            player.first_name,
-                            player.last_name,
-                            PlayerCategory::try_from(player.category).unwrap(),
-                            player.country_code
-                        ));
-                        queries::add_player(&conn, player);
+                        if let Ok(player) = player {
+                            progress.log(format!(
+                                "Downloaded player info for {}: {} {} ({:?}, {:?})",
+                                player.itsf_id,
+                                player.first_name,
+                                player.last_name,
+                                PlayerCategory::try_from(player.category).unwrap(),
+                                player.country_code
+                            ));
+                            queries::add_player(&conn, player);
+                        }
                     }
 
                     for image in join_all(image_futures).await {
