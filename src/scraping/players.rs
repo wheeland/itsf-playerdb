@@ -31,7 +31,7 @@ fn to_normalcase(word: &str) -> String {
 }
 
 async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Player, String> {
-    let itsf = download::download(&url).await?;
+    let itsf = download::download_html(&url).await?;
 
     let nomdujoueur = get_div_with_class(&itsf, "nomdujoueur");
     let nomdujoueur = nomdujoueur.first().ok_or("can't find div nomdujoueur")?;

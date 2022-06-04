@@ -49,7 +49,7 @@ pub async fn download(
         ItsfRankingClass::Combined => "c",
     };
     let url = format!("https://www.tablesoccer.org/page/rankings?category={}{}&system=1&Ranking+Rules=Select+Category&tour={}&vues={}", category, class, year, count);
-    let itsf = download::download(&url).await?;
+    let itsf = download::download_html(&url).await?;
 
     let mut ret = Vec::new();
 
