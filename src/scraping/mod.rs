@@ -11,8 +11,9 @@ use futures_util::future::join_all;
 use r2d2::PooledConnection;
 
 mod download;
-pub mod itsf_rankings;
-pub mod players;
+mod itsf_rankings;
+mod players;
+pub mod dtfb_players;
 
 async fn do_itsf_rankings_downloads(
     conn: PooledConnection<ConnectionManager<SqliteConnection>>,
