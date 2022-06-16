@@ -116,7 +116,6 @@ async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<models::Pl
         itsf_id,
         first_name: first_name.into(),
         last_name: last_name.into(),
-        dtfb_license: None,
         birth_year,
         country_code: Some(country_code.into()),
         category: category.into(),

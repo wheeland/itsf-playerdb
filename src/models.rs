@@ -41,7 +41,6 @@ pub struct Player {
     pub itsf_id: i32,
     pub first_name: String,
     pub last_name: String,
-    pub dtfb_license: Option<String>,
     pub birth_year: i32,
     pub country_code: Option<String>,
     pub category: i32,
