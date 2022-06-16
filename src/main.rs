@@ -1,47 +1,19 @@
 #[macro_use]
 extern crate diesel;
-extern crate dotenv;
-extern crate r2d2;
 
-use std::sync::Weak;
-
+use crate::data::itsf;
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
-use diesel::prelude::*;
-use models::{ItsfRankingCategory, ItsfRankingClass};
-use std::sync::Mutex;
-
-type SqliteDbPool = diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<SqliteConnection>>;
+use std::sync::{Mutex, Weak};
 
 mod background;
+mod data;
 mod json;
-mod models;
-mod queries;
 mod schema;
 mod scraping;
 
 struct AppState {
-    db_pool: SqliteDbPool,
+    data: data::DatabaseRef,
     itsf_ranking_download: Mutex<Weak<background::BackgroundOperationProgress>>,
-}
-
-impl AppState {
-    async fn execute_db_operation<F, R>(
-        data: web::Data<AppState>,
-        f: F,
-    ) -> Result<R, actix_web::Error>
-    where
-        F: FnOnce(&SqliteConnection) -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        // use web::block to offload blocking Diesel code without blocking server thread
-        web::block(move || {
-            let conn = data.db_pool.get()?;
-            let result: Result<R, r2d2::Error> = Ok(f(&conn));
-            result
-        })
-        .await?
-        .map_err(actix_web::error::ErrorInternalServerError)
-    }
 }
 
 #[actix_web::get("/player/{itsf_lic}")]
@@ -50,7 +22,7 @@ async fn get_player(
     itsf_lic: web::Path<i32>,
 ) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
-    
+
     #[derive(serde::Serialize)]
     struct PlayerRankingJson {
         year: i32,
@@ -69,35 +41,31 @@ async fn get_player(
         pub itsf_rankings: Vec<PlayerRankingJson>,
     }
 
-    let player = AppState::execute_db_operation(data, move |conn| {
-        let player = queries::get_player(conn, itsf_lic);
-        player.map(|player| {
-            let itsf_rankings = queries::get_itsf_rankings(conn, itsf_lic)
+    match data.data.get_player(itsf_lic) {
+        Some(player) => {
+            let itsf_rankings = player
+                .itsf_rankings
                 .iter()
-                .map(|ranking| {
-                    PlayerRankingJson {
-                        year: ranking.year,
-                        place: ranking.place,
-                        category: ranking.category.to_str().into(),
-                        class: ranking.class.to_str().into(),
-                    }
+                .map(|ranking| PlayerRankingJson {
+                    year: ranking.year as _,
+                    place: ranking.place as _,
+                    category: ranking.category.to_str().into(),
+                    class: ranking.class.to_str().into(),
                 })
                 .collect();
 
-            PlayerJson {
+            let player = PlayerJson {
                 first_name: player.first_name,
                 last_name: player.last_name,
                 birth_year: player.birth_year,
                 country_code: player.country_code.unwrap_or(String::new()),
                 image_url: format!("/image/{}.jpg", itsf_lic),
                 itsf_rankings,
-            }
-        })
-    }).await?;
+            };
 
-    match player {
-        None => Ok(HttpResponse::BadRequest().json(json::err("no player found"))),
-        Some(player) => Ok(HttpResponse::Ok().json(json::ok(player))),
+            Ok(HttpResponse::Ok().json(json::ok(player)))
+        }
+        None => Ok(HttpResponse::NotFound().json(json::err("No such player"))),
     }
 }
 
@@ -108,13 +76,10 @@ async fn get_player_image(
 ) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
-    let player =
-        AppState::execute_db_operation(data, move |conn| queries::get_player_image(conn, itsf_lic))
-            .await?;
-    match player {
-        Some(image) => Ok(HttpResponse::Ok()
+    match data.data.get_player_image(itsf_lic) {
+        Some(player_image) => Ok(HttpResponse::Ok()
             .append_header(("Content-Type", "image/jpeg"))
-            .body(image.image_data)),
+            .body(player_image.image_data)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
 }
@@ -131,10 +96,10 @@ async fn download_itsf(
     };
 
     let category = match itsf_lic.1.to_lowercase().as_str() {
-        "open" => ItsfRankingCategory::Open,
-        "women" => ItsfRankingCategory::Women,
-        "senior" => ItsfRankingCategory::Senior,
-        "junior" => ItsfRankingCategory::Junior,
+        "open" => itsf::RankingCategory::Open,
+        "women" => itsf::RankingCategory::Women,
+        "senior" => itsf::RankingCategory::Senior,
+        "junior" => itsf::RankingCategory::Junior,
         _ => {
             return Ok(HttpResponse::BadRequest().json(json::err(
                 "Invalid category. Must be one of ['open', 'women', 'senior', 'junior'].",
@@ -143,9 +108,9 @@ async fn download_itsf(
     };
 
     let class = match itsf_lic.2.to_lowercase().as_str() {
-        "singles" => ItsfRankingClass::Singles,
-        "doubles" => ItsfRankingClass::Doubles,
-        "combined" => ItsfRankingClass::Combined,
+        "singles" => itsf::RankingClass::Singles,
+        "doubles" => itsf::RankingClass::Doubles,
+        "combined" => itsf::RankingClass::Combined,
         _ => {
             return Ok(HttpResponse::BadRequest().json(json::err(
                 "Invalid class. Must be one of ['singles', 'doubles', 'combined'].",
@@ -162,11 +127,12 @@ async fn download_itsf(
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    let conn = data
-        .db_pool
-        .get()
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-    *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, vec![year], vec![category], vec![class]);
+    *itsf_ranking_download = scraping::start_itsf_rankings_download(
+        data.data.clone(),
+        vec![year],
+        vec![category],
+        vec![class],
+    );
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -182,15 +148,20 @@ async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Er
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    let conn = data
-        .db_pool
-        .get()
-        .map_err(actix_web::error::ErrorInternalServerError)?;
-
     let years = (2010..2022).collect();
-    let categories = vec![ItsfRankingCategory::Open, ItsfRankingCategory::Women, ItsfRankingCategory::Senior, ItsfRankingCategory::Junior];
-    let classes = vec![ItsfRankingClass::Singles, ItsfRankingClass::Doubles, ItsfRankingClass::Combined];
-    *itsf_ranking_download = scraping::start_itsf_rankings_download(conn, years, categories, classes);
+    let categories = vec![
+        itsf::RankingCategory::Open,
+        itsf::RankingCategory::Women,
+        itsf::RankingCategory::Senior,
+        itsf::RankingCategory::Junior,
+    ];
+    let classes = vec![
+        itsf::RankingClass::Singles,
+        itsf::RankingClass::Doubles,
+        itsf::RankingClass::Combined,
+    ];
+    *itsf_ranking_download =
+        scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -200,15 +171,9 @@ async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
     env_logger::init();
 
-    // Open SQLite database pool
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
-    let db_manager = diesel::r2d2::ConnectionManager::<SqliteConnection>::new(database_url);
-    let db_pool = r2d2::Pool::builder()
-        .build(db_manager)
-        .expect("Failed to create R2D2 pool.");
-
+    let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
     let state = AppState {
-        db_pool,
+        data: data::DatabaseRef::load(&database_path),
         itsf_ranking_download: Mutex::new(Weak::new()),
     };
     let state = web::Data::new(state);

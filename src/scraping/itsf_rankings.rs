@@ -1,5 +1,5 @@
 use super::download;
-use crate::models::{ItsfRankingCategory, ItsfRankingClass};
+use crate::data::itsf::*;
 use scraper::{ElementRef, Selector};
 
 fn get_player_from_div(div: &ElementRef) -> Result<(i32, i32), &'static str> {
@@ -33,20 +33,20 @@ fn get_player_from_div(div: &ElementRef) -> Result<(i32, i32), &'static str> {
 
 pub async fn download(
     year: i32,
-    category: ItsfRankingCategory,
-    class: ItsfRankingClass,
+    category: RankingCategory,
+    class: RankingClass,
     count: usize,
 ) -> Result<Vec<(i32, i32)>, String> {
     let category = match category {
-        ItsfRankingCategory::Open => "o",
-        ItsfRankingCategory::Women => "w",
-        ItsfRankingCategory::Junior => "j",
-        ItsfRankingCategory::Senior => "s",
+        RankingCategory::Open => "o",
+        RankingCategory::Women => "w",
+        RankingCategory::Junior => "j",
+        RankingCategory::Senior => "s",
     };
     let class = match class {
-        ItsfRankingClass::Singles => "s",
-        ItsfRankingClass::Doubles => "d",
-        ItsfRankingClass::Combined => "c",
+        RankingClass::Singles => "s",
+        RankingClass::Doubles => "d",
+        RankingClass::Combined => "c",
     };
     let url = format!("https://www.tablesoccer.org/page/rankings?category={}{}&system=1&Ranking+Rules=Select+Category&tour={}&vues={}", category, class, year, count);
     let itsf = download::download_html(&url).await?;

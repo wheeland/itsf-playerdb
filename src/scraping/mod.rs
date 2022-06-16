@@ -1,28 +1,28 @@
-use std::sync::{Arc, Weak};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Weak},
+};
 
 use crate::{
     background::BackgroundOperationProgress,
-    models::{ItsfRankingCategory, ItsfRankingClass, PlayerCategory},
-    queries,
+    data::DatabaseRef,
+    data::{dtfb, itsf},
 };
-use chrono::Utc;
-use diesel::{prelude::*, r2d2::ConnectionManager};
 use futures_util::future::join_all;
-use r2d2::PooledConnection;
 
 mod download;
+mod dtfb_players;
 mod itsf_rankings;
 mod players;
-mod dtfb_players;
 
 async fn download_itsf_players(
-    conn: &mut PooledConnection<ConnectionManager<SqliteConnection>>,
+    db: &DatabaseRef,
     player_itsf_ids: &[i32],
     progress: Arc<BackgroundOperationProgress>,
 ) -> Result<(), String> {
     let mut missing_players: Vec<i32> = player_itsf_ids
         .into_iter()
-        .filter_map(|itsf_lic| match queries::get_player(conn, *itsf_lic) {
+        .filter_map(|itsf_lic| match db.get_player(*itsf_lic) {
             None => Some(*itsf_lic),
             Some(_) => None,
         })
@@ -30,14 +30,17 @@ async fn download_itsf_players(
 
     if missing_players.len() > 0 {
         progress.set_progress(1, missing_players.len() + 1);
-        progress.log(format!("[ITSF] Downloading {} ITSF player profiles", missing_players.len()));
+        progress.log(format!(
+            "[ITSF] Downloading {} ITSF player profiles",
+            missing_players.len()
+        ));
 
         // query players in sets of N, to hide ITSF server latency
-        const MAX_CONCURRENT: usize = 10;
+        const MAX_CONCURRENT: usize = 3;
         while missing_players.len() > 0 {
             let mut player_futures = Vec::new();
             let mut image_futures = Vec::new();
-            let count = missing_players.len().max(MAX_CONCURRENT);
+            let count = missing_players.len().min(MAX_CONCURRENT);
             for _ in 0..count {
                 let itsf_id = missing_players.pop().unwrap();
                 player_futures.push(players::download_player_info(itsf_id));
@@ -45,26 +48,31 @@ async fn download_itsf_players(
             }
 
             for player in join_all(player_futures).await {
-                if let Ok(player) = player {
-                    progress.log(format!(
-                        "[ITSF] Downloaded player info for {}: {} {} ({:?}, {:?})",
-                        player.itsf_id,
-                        player.first_name,
-                        player.last_name,
-                        PlayerCategory::try_from(player.category).unwrap(),
-                        player.country_code
-                    ));
-                    queries::add_player(conn, player);
+                match player {
+                    Ok(player) => {
+                        progress.log(format!(
+                            "[ITSF] Downloaded player info for {}: {} {} ({:?}, {:?})",
+                            player.itsf_id,
+                            player.first_name,
+                            player.last_name,
+                            itsf::PlayerCategory::try_from(player.category).unwrap(),
+                            player.country_code
+                        ));
+                        db.add_player(player);
+                    }
+                    Err(err) => {
+                        progress.log(format!("[ITSF] Failed to download player: {}", err));
+                    }
                 }
             }
 
             for image in join_all(image_futures).await {
                 if let Some(image) = image? {
-                    queries::add_player_image(conn, image);
+                    db.set_player_image(image);
                 }
             }
         }
-        
+
         progress.log(format!("[ITSF] ... done"));
     }
 
@@ -72,28 +80,38 @@ async fn download_itsf_players(
 }
 
 async fn do_itsf_rankings_downloads(
-    conn: PooledConnection<ConnectionManager<SqliteConnection>>,
+    db: &DatabaseRef,
     years: Vec<i32>,
-    categories: Vec<ItsfRankingCategory>,
-    classes: Vec<ItsfRankingClass>,
+    categories: Vec<itsf::RankingCategory>,
+    classes: Vec<itsf::RankingClass>,
     progress: Arc<BackgroundOperationProgress>,
 ) -> Result<(), String> {
     for year in years {
-        for category in &categories {
-            for class in &classes {
+        for category in categories.iter().cloned() {
+            for class in classes.iter().cloned() {
                 log::error!(
                     "starting download of ITSF rankings for {}, {:?}, {:?}",
                     year,
                     category,
                     class
                 );
-                let rankings = itsf_rankings::download(year, *category, *class, 100).await?;
+
+                let rankings = itsf_rankings::download(year, category, class, 100).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
-                download_itsf_players(&mut conn, &itsf_player_ids, progress.clone()).await?;
+                download_itsf_players(db, &itsf_player_ids, progress.clone()).await?;
 
-                let queried_at = Utc::now().naive_utc();
-                queries::add_itsf_rankings(&conn, year, queried_at, *category, *class, &rankings);
+                for placement in rankings {
+                    db.add_player_itsf_ranking(
+                        placement.1,
+                        itsf::Ranking {
+                            year,
+                            category,
+                            class,
+                            place: placement.0,
+                        },
+                    );
+                }
             }
         }
     }
@@ -101,18 +119,98 @@ async fn do_itsf_rankings_downloads(
 }
 
 pub fn start_itsf_rankings_download(
-    conn: PooledConnection<ConnectionManager<SqliteConnection>>,
+    db: DatabaseRef,
     years: Vec<i32>,
-    categories: Vec<ItsfRankingCategory>,
-    classes: Vec<ItsfRankingClass>,
+    categories: Vec<itsf::RankingCategory>,
+    classes: Vec<itsf::RankingClass>,
 ) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("ITSF Rankings Download", 1);
     tokio::spawn(async move {
-        match do_itsf_rankings_downloads(conn, years, categories, classes, arc.clone()).await {
+        match do_itsf_rankings_downloads(&db, years, categories, classes, arc.clone()).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to download ITSF rankings: {}", err),
         };
         arc.set_progress(1, 1);
     });
     weak
+}
+
+async fn do_dtfb_rankings_download(
+    db: DatabaseRef,
+    tournament_ids: Vec<i32>,
+    progress: Arc<BackgroundOperationProgress>,
+) -> Result<(), String> {
+    log::error!(
+        "starting download of DTFB rankings for tournaments {:?}",
+        tournament_ids
+    );
+
+    let mut dtfb_player_ids = HashSet::new();
+
+    for tournament_id in tournament_ids.into_iter().enumerate() {
+        let rankings = dtfb_players::collect_dtfb_ids_from_rankings(tournament_id.1).await?;
+        for id in rankings {
+            dtfb_player_ids.insert(id);
+        }
+    }
+
+    let mut dtfb_player_ids: Vec<i32> = dtfb_player_ids.into_iter().collect();
+    let mut dtfb_players = Vec::new();
+
+    // download DTFB player profiles for every single player
+    const MAX_CONCURRENT: usize = 5;
+    while dtfb_player_ids.len() > 0 {
+        let mut player_futures = Vec::new();
+        let count = dtfb_player_ids.len().min(MAX_CONCURRENT);
+        for _ in 0..count {
+            let dtfb_id = dtfb_player_ids.pop().unwrap();
+            player_futures.push(dtfb_players::DtfbPlayerInfo::download(dtfb_id));
+        }
+
+        for dtfb_player in join_all(player_futures).await {
+            let dtfb_player = dtfb_player?;
+            progress.log(format!(
+                "[DTFB] Downloaded player info for DTFB={}, ITSF={}",
+                dtfb_player.dtfb_id, dtfb_player.itsf_id,
+            ));
+            dtfb_players.push(dtfb_player);
+        }
+    }
+
+    let itsf_player_ids: Vec<i32> = dtfb_players.iter().map(|player| player.itsf_id).collect();
+    download_itsf_players(&db, &itsf_player_ids, progress.clone()).await?;
+
+    // add DTFB player data to DB
+    for dtfb_player in dtfb_players {
+        db.set_player_dtfb_id(dtfb_player.itsf_id, dtfb_player.dtfb_id);
+
+        for result in dtfb_player.championship_results {
+            db.add_player_dtfb_championship_result(
+                dtfb_player.itsf_id,
+                dtfb::NationalChampionshipResult {
+                    year: result.year,
+                    place: result.place,
+                    category: result.category.into(),
+                    class: result.class.into(),
+                },
+            );
+        }
+
+        for ranking in dtfb_player.national_rankings {
+            db.add_player_dtfb_ranking(
+                dtfb_player.itsf_id,
+                dtfb::NationalRanking {
+                    year: ranking.year,
+                    place: ranking.place,
+                    category: ranking.category.into(),
+                },
+            );
+        }
+
+        for team in dtfb_player.teams {
+            db.add_player_dtfb_team(dtfb_player.itsf_id, team.0, team.1.clone());
+        }
+    }
+
+    Ok(())
 }

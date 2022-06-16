@@ -6,15 +6,15 @@ edition = "2021"
 [dependencies]
 actix-web = "4.0.0"
 actix-web-httpauth = "0.6.0"
+dotenv = "0.15.0"
 env_logger = "0.9.0"
 log = "0.4.17"
 maud = "0.23.0"
-libsqlite3-sys = { version = "^0", features = ["bundled"] }
-diesel = { version = "1.4.8", features = ["sqlite", "r2d2", "chrono"] }
+libsqlite3-sys = { version = "0.24.2", features = ["bundled"] }
+diesel_migrations = { version = "2.0.0-rc.0", git = "https://github.com/diesel-rs/diesel/"}
+diesel = { version = "2.0.0-rc.0", features = ["sqlite", "r2d2", "chrono"], git = "https://github.com/diesel-rs/diesel" }
 futures-util = "0.3.21"
-r2d2 = "^0"
-chrono = "^0"
-dotenv = "0.15.0"
+chrono = { version = "^0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 num_enum = "0.5.7"
