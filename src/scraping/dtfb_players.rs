@@ -4,7 +4,7 @@ use crate::models::{DtfbChampionshipCategory, DtfbChampionshipClass};
 
 use super::download;
 
-pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<(i32)>, String> {
+pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<i32>, String> {
     let url = format!("https://dtfb.de/wettbewerbe/turnierserie/rangliste?task=rangliste&id={}", ranking_id);
     let itsf = download::download_html(&url).await?;
 
@@ -25,10 +25,10 @@ pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<(i32)
     Ok(ret)
 }
 
-pub struct DtfbNationaRanking {
+pub struct DtfbNationalRanking {
     pub year: i32,
     pub place: i32,
-    category: DtfbChampionshipCategory,
+    pub category: DtfbChampionshipCategory,
 }
 
 pub struct DtfbChampionshipResult {
@@ -43,7 +43,7 @@ pub struct DtfbPlayerInfo
     pub dtfb_id: i32,
     pub itsf_id: i32,
     pub championship_results: Vec<DtfbChampionshipResult>,
-    pub national_rankings: Vec<DtfbNationaRanking>,
+    pub national_rankings: Vec<DtfbNationalRanking>,
     pub teams: Vec<(i32, String)>,
 }
 
@@ -149,7 +149,7 @@ impl DtfbPlayerInfo {
                 _ => None,
             };
             if let Some(category) = category {
-                national_rankings.push(DtfbNationaRanking { 
+                national_rankings.push(DtfbNationalRanking { 
                     year: saisonbezeichnung, 
                     place: platz,
                     category,

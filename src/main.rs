@@ -5,7 +5,7 @@ extern crate r2d2;
 
 use std::sync::Weak;
 
-use actix_web::{http::header, middleware::Logger, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use diesel::prelude::*;
 use models::{ItsfRankingCategory, ItsfRankingClass};
 use std::sync::Mutex;
