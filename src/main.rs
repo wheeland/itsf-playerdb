@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate diesel;
 
-use crate::data::itsf;
+use crate::data::{dtfb, itsf};
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use std::sync::{Mutex, Weak};
 
@@ -36,6 +36,9 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
         pub country_code: String,
         pub image_url: String,
         pub itsf_rankings: Vec<PlayerRankingJson>,
+        pub dtfb_rankings: Vec<dtfb::NationalRanking>,
+        pub dm_placements: Vec<dtfb::NationalChampionshipResult>,
+        pub dtfl_teams: Vec<(i32, String)>,
     }
 
     match data.data.get_player(itsf_lic) {
@@ -58,6 +61,9 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
                 country_code: player.country_code.unwrap_or(String::new()),
                 image_url: format!("/image/{}.jpg", itsf_lic),
                 itsf_rankings,
+                dtfb_rankings: player.dtfb_national_rankings,
+                dm_placements: player.dtfb_championship_results,
+                dtfl_teams: player.dtfb_league_teams,
             };
 
             Ok(HttpResponse::Ok().json(json::ok(player)))
