@@ -84,7 +84,7 @@ fn array<'a>(json: &'a serde_json::Value, name: &str) -> Result<&'a Vec<serde_js
 }
 
 impl DtfbPlayerInfo {
-    pub async fn download(dtfb_id: i32) -> Result<Self, String> {
+    async fn try_download(dtfb_id: i32) -> Result<Self, String> {
         let url = format!(
             "https://dtfb.de/component/sportsmanager?task=spieler_details&id={}&format=json",
             dtfb_id
@@ -179,5 +179,9 @@ impl DtfbPlayerInfo {
             national_rankings,
             teams: player_teams,
         })
+    }
+
+    pub async fn download(dtfb_id: i32) -> Result<Self, String> {
+        Self::try_download(dtfb_id).await.map_err(|err| format!("DTFB={}: {}", dtfb_id, err))
     }
 }
