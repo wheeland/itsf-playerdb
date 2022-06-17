@@ -13,14 +13,11 @@ mod scraping;
 
 struct AppState {
     data: data::DatabaseRef,
-    itsf_ranking_download: Mutex<Weak<background::BackgroundOperationProgress>>,
+    download: Mutex<Weak<background::BackgroundOperationProgress>>,
 }
 
 #[actix_web::get("/player/{itsf_lic}")]
-async fn get_player(
-    data: web::Data<AppState>,
-    itsf_lic: web::Path<i32>,
-) -> Result<HttpResponse, Error> {
+async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
     #[derive(serde::Serialize)]
@@ -70,10 +67,7 @@ async fn get_player(
 }
 
 #[actix_web::get("/image/{itsf_lic}.jpg")]
-async fn get_player_image(
-    data: web::Data<AppState>,
-    itsf_lic: web::Path<i32>,
-) -> Result<HttpResponse, Error> {
+async fn get_player_image(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
 
     match data.data.get_player_image(itsf_lic) {
@@ -84,7 +78,7 @@ async fn get_player_image(
     }
 }
 
-#[actix_web::get("/download/{year}/{category}/{class}")]
+#[actix_web::get("/download_itsf/{year}/{category}/{class}")]
 async fn download_itsf(
     data: web::Data<AppState>,
     itsf_lic: web::Path<(i32, String, String)>,
@@ -118,33 +112,46 @@ async fn download_itsf(
         }
     };
 
-    let mut itsf_ranking_download = data
-        .itsf_ranking_download
+    let mut download = data
+        .download
         .lock()
         .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
 
-    if let Some(_) = itsf_ranking_download.upgrade() {
+    if let Some(_) = download.upgrade() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    *itsf_ranking_download = scraping::start_itsf_rankings_download(
-        data.data.clone(),
-        vec![year],
-        vec![category],
-        vec![class],
-    );
+    *download = scraping::start_itsf_rankings_download(data.data.clone(), vec![year], vec![category], vec![class]);
+
+    Ok(HttpResponse::Ok().json(json::ok("Started download")))
+}
+
+#[actix_web::get("/download_dtfb/{ranking_id}")]
+async fn download_dtfb(data: web::Data<AppState>, ranking_id: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let ranking_id = ranking_id.into_inner();
+
+    let mut download = data
+        .download
+        .lock()
+        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
+
+    if let Some(_) = download.upgrade() {
+        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
+    }
+
+    *download = scraping::start_dtfb_rankings_download(data.data.clone(), vec![ranking_id]);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
 
 #[actix_web::get("/download_all")]
 async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let mut itsf_ranking_download = data
-        .itsf_ranking_download
+    let mut download = data
+        .download
         .lock()
         .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
 
-    if let Some(_) = itsf_ranking_download.upgrade() {
+    if let Some(_) = download.upgrade() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
@@ -160,8 +167,7 @@ async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Er
         itsf::RankingClass::Doubles,
         itsf::RankingClass::Combined,
     ];
-    *itsf_ranking_download =
-        scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes);
+    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -174,7 +180,7 @@ async fn main() -> std::io::Result<()> {
     let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
     let state = AppState {
         data: data::DatabaseRef::load(&database_path),
-        itsf_ranking_download: Mutex::new(Weak::new()),
+        download: Mutex::new(Weak::new()),
     };
     let state = web::Data::new(state);
 
@@ -187,6 +193,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_player)
             .service(get_player_image)
             .service(download_itsf)
+            .service(download_dtfb)
             .service(download_all_itsf)
     })
     .bind(("0.0.0.0", 8080))?

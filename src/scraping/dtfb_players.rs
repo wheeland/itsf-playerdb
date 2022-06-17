@@ -53,18 +53,11 @@ fn int(json: &serde_json::Value, name: &str) -> Result<i32, String> {
 }
 
 fn string<'a>(json: &'a serde_json::Value, name: &str) -> Result<&'a str, String> {
-    value(json, name)?
-        .as_str()
-        .ok_or(format!("not a string: {}", name))
+    value(json, name)?.as_str().ok_or(format!("not a string: {}", name))
 }
 
-fn array<'a>(
-    json: &'a serde_json::Value,
-    name: &str,
-) -> Result<&'a Vec<serde_json::Value>, String> {
-    value(json, name)?
-        .as_array()
-        .ok_or(format!("Not an array: {}", name))
+fn array<'a>(json: &'a serde_json::Value, name: &str) -> Result<&'a Vec<serde_json::Value>, String> {
+    value(json, name)?.as_array().ok_or(format!("Not an array: {}", name))
 }
 
 impl DtfbPlayerInfo {
@@ -85,10 +78,7 @@ impl DtfbPlayerInfo {
         let ranglisten_platzierungen = array(data, "ranglisten_platzierungen")?;
 
         if spieler_id != dtfb_id {
-            return Err(format!(
-                "DTFB player id doesn't match: {} vs {}",
-                dtfb_id, spieler_id
-            ));
+            return Err(format!("DTFB player id doesn't match: {} vs {}", dtfb_id, spieler_id));
         }
 
         let mut player_teams = Vec::new();

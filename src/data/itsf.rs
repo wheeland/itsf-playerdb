@@ -81,8 +81,6 @@ pub struct Ranking {
 
 impl Ranking {
     pub fn matches(&self, other_ranking: &Self) -> bool {
-        self.year == other_ranking.year
-            && self.category == other_ranking.category
-            && self.class == other_ranking.class
+        self.year == other_ranking.year && self.category == other_ranking.category && self.class == other_ranking.class
     }
 }

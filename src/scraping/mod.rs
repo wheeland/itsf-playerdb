@@ -137,17 +137,14 @@ pub fn start_itsf_rankings_download(
 
 async fn do_dtfb_rankings_download(
     db: DatabaseRef,
-    tournament_ids: Vec<i32>,
+    ranking_ids: Vec<i32>,
     progress: Arc<BackgroundOperationProgress>,
 ) -> Result<(), String> {
-    log::error!(
-        "starting download of DTFB rankings for tournaments {:?}",
-        tournament_ids
-    );
+    log::error!("starting download of DTFB rankings for tournaments {:?}", ranking_ids);
 
     let mut dtfb_player_ids = HashSet::new();
 
-    for tournament_id in tournament_ids.into_iter().enumerate() {
+    for tournament_id in ranking_ids.into_iter().enumerate() {
         let rankings = dtfb_players::collect_dtfb_ids_from_rankings(tournament_id.1).await?;
         for id in rankings {
             dtfb_player_ids.insert(id);
@@ -213,4 +210,16 @@ async fn do_dtfb_rankings_download(
     }
 
     Ok(())
+}
+
+pub fn start_dtfb_rankings_download(db: DatabaseRef, ranking_ids: Vec<i32>) -> Weak<BackgroundOperationProgress> {
+    let (arc, weak) = BackgroundOperationProgress::new("DTFB Rankings Download", 1);
+    tokio::spawn(async move {
+        match do_dtfb_rankings_download(db, ranking_ids, arc.clone()).await {
+            Ok(_) => {}
+            Err(err) => log::error!("failed to download DTFB rankings: {}", err),
+        };
+        arc.set_progress(1, 1);
+    });
+    weak
 }

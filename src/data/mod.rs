@@ -48,9 +48,7 @@ impl DatabaseRef {
         let mut players = HashMap::new();
 
         for player_id in db.get_player_ids() {
-            let player = db
-                .read_player_json(player_id)
-                .expect("failed to read player");
+            let player = db.read_player_json(player_id).expect("failed to read player");
             players.insert(player_id, player);
         }
 
@@ -71,10 +69,7 @@ impl DatabaseRef {
 
     pub fn add_player(&self, player: Player) {
         let mut inner = self.inner.lock().unwrap();
-        inner
-            .db
-            .borrow_mut()
-            .write_player_json(player.itsf_id, &player);
+        inner.db.borrow_mut().write_player_json(player.itsf_id, &player);
         inner.players.insert(player.itsf_id, player);
     }
 
@@ -117,24 +112,16 @@ impl DatabaseRef {
         });
     }
 
-    pub fn add_player_dtfb_championship_result(
-        &self,
-        itsf_id: i32,
-        result: dtfb::NationalChampionshipResult,
-    ) {
+    pub fn add_player_dtfb_championship_result(&self, itsf_id: i32, result: dtfb::NationalChampionshipResult) {
         self.modify_player(itsf_id, |player| {
-            player
-                .dtfb_championship_results
-                .retain(|r| !result.matches(&r));
+            player.dtfb_championship_results.retain(|r| !result.matches(&r));
             player.dtfb_championship_results.push(result);
         });
     }
 
     pub fn add_player_dtfb_ranking(&self, itsf_id: i32, ranking: dtfb::NationalRanking) {
         self.modify_player(itsf_id, |player| {
-            player
-                .dtfb_national_rankings
-                .retain(|r| !ranking.matches(&r));
+            player.dtfb_national_rankings.retain(|r| !ranking.matches(&r));
             player.dtfb_national_rankings.push(ranking);
         });
     }

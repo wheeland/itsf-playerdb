@@ -43,13 +43,7 @@ impl BackgroundOperationProgress {
         return progress.0 >= progress.1;
     }
 
-    pub fn new(
-        title: &str,
-        max: usize,
-    ) -> (
-        Arc<BackgroundOperationProgress>,
-        Weak<BackgroundOperationProgress>,
-    ) {
+    pub fn new(title: &str, max: usize) -> (Arc<BackgroundOperationProgress>, Weak<BackgroundOperationProgress>) {
         let this = BackgroundOperationProgress {
             title: title.into(),
             inner: Mutex::new(BackgroundOperationInner {

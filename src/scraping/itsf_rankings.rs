@@ -7,9 +7,7 @@ fn get_player_from_div(div: &ElementRef) -> Result<(i32, i32), &'static str> {
     let onclick = div.value().attr("onclick").ok_or("no onclick attr")?;
 
     let place = if id.starts_with("place") {
-        id[5..]
-            .parse::<i32>()
-            .map_err(|_| "can't parse place attr")?
+        id[5..].parse::<i32>().map_err(|_| "can't parse place attr")?
     } else {
         Err("id attr has no place")?
     };
