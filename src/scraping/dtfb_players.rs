@@ -4,7 +4,7 @@ use crate::data::dtfb::*;
 
 use super::download;
 
-pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<i32>, String> {
+pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32, max_rank: usize) -> Result<Vec<i32>, String> {
     let url = format!(
         "https://dtfb.de/wettbewerbe/turnierserie/rangliste?task=rangliste&id={}",
         ranking_id
@@ -16,7 +16,7 @@ pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<i32>,
     for a in html.select(&Selector::parse("a").unwrap()) {
         if let Some(href) = a.value().attr("href") {
             let parts: Vec<&str> = href.split("?task=spieler_details&id=").collect();
-            if parts.len() == 2 {
+            if parts.len() == 2 && ret.len() <= max_rank {
                 match parts[1].parse::<i32>() {
                     Ok(id) => ret.push(id),
                     Err(_) => log::error!("failed to parse DTFB player id: {}", href),

@@ -96,7 +96,7 @@ async fn do_itsf_rankings_downloads(
                     class
                 );
 
-                let rankings = itsf_rankings::download(year, category, class, 100).await?;
+                let rankings = itsf_rankings::download(year, category, class, 200).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
                 download_itsf_players(db, &itsf_player_ids, progress.clone()).await?;
@@ -147,7 +147,7 @@ async fn do_dtfb_rankings_download(
     for season in seasons {
         let ranking_ids = dtfb_players::collect_dtfb_rankings_for_season(season).await?;
         for ranking_id in ranking_ids {
-            let rankings = dtfb_players::collect_dtfb_ids_from_rankings(ranking_id).await?;
+            let rankings = dtfb_players::collect_dtfb_ids_from_rankings(ranking_id, 200).await?;
             for id in rankings {
                 dtfb_player_ids.insert(id);
             }
