@@ -18,6 +18,6 @@ chrono = { version = "^0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 num_enum = "0.5.7"
-reqwest = "0.11.10"
+reqwest = { version = "0.11.10", features = [ "cookies" ] }
 scraper = "0.13.0"
 tokio = "^1.0"
