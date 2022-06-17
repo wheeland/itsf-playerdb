@@ -1,7 +1,6 @@
 use crate::data::{itsf::PlayerCategory, Player, PlayerImage};
 
 use super::download;
-use futures_util::TryFutureExt;
 use reqwest::StatusCode;
 use scraper::{ElementRef, Html, Selector};
 
@@ -106,13 +105,9 @@ fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
 }
 
 async fn download_player_info_from(itsf_id: i32, url: &str) -> Result<Player, String> {
-    let body = download::download(url).await?;
+    let body = download::download(url, &[]).await?;
     let itsf = Html::parse_document(&body);
-    let ret = parse_player_info_from(itsf_id, &itsf);
-    if let Err(err) = &ret {
-        std::fs::write(format!("itsf_{}.html", itsf_id), body);
-    }
-    ret
+    parse_player_info_from(itsf_id, &itsf)
 }
 
 pub async fn download_player_info(itsf_id: i32) -> Result<Player, String> {

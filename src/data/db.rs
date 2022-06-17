@@ -1,7 +1,7 @@
 use diesel::sqlite::SqliteConnection;
 use diesel::{prelude::*, Insertable, Queryable};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::schema::*;
 

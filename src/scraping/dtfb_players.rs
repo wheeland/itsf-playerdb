@@ -1,4 +1,4 @@
-use scraper::Selector;
+use scraper::{Html, Selector};
 
 use crate::data::dtfb::*;
 
@@ -9,17 +9,40 @@ pub async fn collect_dtfb_ids_from_rankings(ranking_id: i32) -> Result<Vec<i32>,
         "https://dtfb.de/wettbewerbe/turnierserie/rangliste?task=rangliste&id={}",
         ranking_id
     );
-    let itsf = download::download_html(&url).await?;
+    let html = download::download_html(&url).await?;
 
     let mut ret = Vec::new();
 
-    for a in itsf.select(&Selector::parse("a").unwrap()) {
+    for a in html.select(&Selector::parse("a").unwrap()) {
         if let Some(href) = a.value().attr("href") {
             let parts: Vec<&str> = href.split("?task=spieler_details&id=").collect();
             if parts.len() == 2 {
                 match parts[1].parse::<i32>() {
                     Ok(id) => ret.push(id),
                     Err(_) => log::error!("failed to parse DTFB player id: {}", href),
+                }
+            }
+        }
+    }
+
+    Ok(ret)
+}
+
+pub async fn collect_dtfb_rankings_for_season(season: i32) -> Result<Vec<i32>, String> {
+    let url = "https://dtfb.de/wettbewerbe/turnierserie/rangliste";
+    let cookies = format!("sportsmanager_filter_saison_id={}", season);
+    let html = download::download(url, &[("Cookie", &cookies)]).await?;
+    let html = Html::parse_document(&html);
+
+    let mut ret = Vec::new();
+
+    for a in html.select(&Selector::parse("a").unwrap()) {
+        if let Some(href) = a.value().attr("href") {
+            let parts: Vec<&str> = href.split("?task=rangliste&id=").collect();
+            if parts.len() == 2 {
+                match parts[1].parse::<i32>() {
+                    Ok(id) => ret.push(id),
+                    Err(_) => log::error!("failed to parse DTFB rankings link: {}", href),
                 }
             }
         }
@@ -46,7 +69,7 @@ fn int(json: &serde_json::Value, name: &str) -> Result<i32, String> {
         Ok(int as i32)
     } else if let Some(st) = value.as_str() {
         st.parse::<i32>()
-            .map_err(|err| format!("not an int: {}: '{}'", name, st))
+            .map_err(|_| format!("not an int: {}: '{}'", name, st))
     } else {
         Err(format!("not an int: {}", name))
     }
@@ -66,7 +89,7 @@ impl DtfbPlayerInfo {
             "https://dtfb.de/component/sportsmanager?task=spieler_details&id={}&format=json",
             dtfb_id
         );
-        let json = download::download(&url).await?;
+        let json = download::download(&url, &[]).await?;
         let json: serde_json::Value = serde_json::from_str(&json).map_err(|err| err.to_string())?;
 
         let data = value(&json, "data")?;

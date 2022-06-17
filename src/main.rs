@@ -78,40 +78,7 @@ async fn get_player_image(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -
     }
 }
 
-#[actix_web::get("/download_itsf/{year}/{category}/{class}")]
-async fn download_itsf(
-    data: web::Data<AppState>,
-    itsf_lic: web::Path<(i32, String, String)>,
-) -> Result<HttpResponse, Error> {
-    let year = if itsf_lic.0 > 2006 {
-        itsf_lic.0
-    } else {
-        return Ok(HttpResponse::BadRequest().json(json::err("Invalid year")));
-    };
-
-    let category = match itsf_lic.1.to_lowercase().as_str() {
-        "open" => itsf::RankingCategory::Open,
-        "women" => itsf::RankingCategory::Women,
-        "senior" => itsf::RankingCategory::Senior,
-        "junior" => itsf::RankingCategory::Junior,
-        _ => {
-            return Ok(HttpResponse::BadRequest().json(json::err(
-                "Invalid category. Must be one of ['open', 'women', 'senior', 'junior'].",
-            )))
-        }
-    };
-
-    let class = match itsf_lic.2.to_lowercase().as_str() {
-        "singles" => itsf::RankingClass::Singles,
-        "doubles" => itsf::RankingClass::Doubles,
-        "combined" => itsf::RankingClass::Combined,
-        _ => {
-            return Ok(HttpResponse::BadRequest().json(json::err(
-                "Invalid class. Must be one of ['singles', 'doubles', 'combined'].",
-            )))
-        }
-    };
-
+fn download_itsf(data: web::Data<AppState>, years: Vec<i32>) -> Result<HttpResponse, Error> {
     let mut download = data
         .download
         .lock()
@@ -121,41 +88,6 @@ async fn download_itsf(
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    *download = scraping::start_itsf_rankings_download(data.data.clone(), vec![year], vec![category], vec![class]);
-
-    Ok(HttpResponse::Ok().json(json::ok("Started download")))
-}
-
-#[actix_web::get("/download_dtfb/{ranking_id}")]
-async fn download_dtfb(data: web::Data<AppState>, ranking_id: web::Path<i32>) -> Result<HttpResponse, Error> {
-    let ranking_id = ranking_id.into_inner();
-
-    let mut download = data
-        .download
-        .lock()
-        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
-
-    if let Some(_) = download.upgrade() {
-        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
-    }
-
-    *download = scraping::start_dtfb_rankings_download(data.data.clone(), vec![ranking_id]);
-
-    Ok(HttpResponse::Ok().json(json::ok("Started download")))
-}
-
-#[actix_web::get("/download_all")]
-async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let mut download = data
-        .download
-        .lock()
-        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
-
-    if let Some(_) = download.upgrade() {
-        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
-    }
-
-    let years = (2010..2022).collect();
     let categories = vec![
         itsf::RankingCategory::Open,
         itsf::RankingCategory::Women,
@@ -170,6 +102,56 @@ async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Er
     *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
+}
+
+#[actix_web::get("/download_itsf/{year}")]
+async fn download_itsf_single(data: web::Data<AppState>, year: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let year = year.into_inner();
+    let year = if year > 2006 {
+        year
+    } else {
+        return Ok(HttpResponse::BadRequest().json(json::err("Invalid year")));
+    };
+
+    download_itsf(data, vec![year])
+}
+
+#[actix_web::get("/download_itsf_all")]
+async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    let years = (2010..2022).collect();
+    download_itsf(data, years)
+}
+
+fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>) -> Result<HttpResponse, Error> {
+    let mut download = data
+        .download
+        .lock()
+        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
+
+    if let Some(_) = download.upgrade() {
+        return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
+    }
+
+    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons);
+
+    Ok(HttpResponse::Ok().json(json::ok("Started download")))
+}
+
+#[actix_web::get("/download_dtfb/{season}")]
+async fn download_dtfb_single(data: web::Data<AppState>, season: web::Path<i32>) -> Result<HttpResponse, Error> {
+    let season = season.into_inner();
+    let season = if season > 2008 {
+        season
+    } else {
+        return Ok(HttpResponse::BadRequest().json(json::err("Invalid season")));
+    };
+    download_dtfb(data, vec![season])
+}
+
+#[actix_web::get("/download_dtfb_all")]
+async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    let seasons = (2010..2022).collect();
+    download_dtfb(data, seasons)
 }
 
 #[actix_web::main]
@@ -192,9 +174,10 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .service(get_player)
             .service(get_player_image)
-            .service(download_itsf)
-            .service(download_dtfb)
+            .service(download_itsf_single)
             .service(download_all_itsf)
+            .service(download_dtfb_single)
+            .service(download_dtfb_all)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
