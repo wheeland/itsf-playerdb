@@ -21,21 +21,13 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
     let itsf_lic = itsf_lic.into_inner();
 
     #[derive(serde::Serialize)]
-    struct PlayerRankingJson {
-        year: i32,
-        place: i32,
-        category: String,
-        class: String,
-    }
-
-    #[derive(serde::Serialize)]
     struct PlayerJson {
         pub first_name: String,
         pub last_name: String,
         pub birth_year: i32,
         pub country_code: String,
         pub image_url: String,
-        pub itsf_rankings: Vec<PlayerRankingJson>,
+        pub itsf_rankings: Vec<itsf::Ranking>,
         pub dtfb_rankings: Vec<dtfb::NationalRanking>,
         pub dm_placements: Vec<dtfb::NationalChampionshipResult>,
         pub dtfl_teams: Vec<(i32, String)>,
@@ -43,24 +35,13 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
 
     match data.data.get_player(itsf_lic) {
         Some(player) => {
-            let itsf_rankings = player
-                .itsf_rankings
-                .iter()
-                .map(|ranking| PlayerRankingJson {
-                    year: ranking.year as _,
-                    place: ranking.place as _,
-                    category: ranking.category.to_str().into(),
-                    class: ranking.class.to_str().into(),
-                })
-                .collect();
-
             let player = PlayerJson {
                 first_name: player.first_name,
                 last_name: player.last_name,
                 birth_year: player.birth_year,
                 country_code: player.country_code.unwrap_or(String::new()),
                 image_url: format!("/image/{}.jpg", itsf_lic),
-                itsf_rankings,
+                itsf_rankings: player.itsf_rankings,
                 dtfb_rankings: player.dtfb_national_rankings,
                 dm_placements: player.dtfb_championship_results,
                 dtfl_teams: player.dtfb_league_teams,
