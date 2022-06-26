@@ -67,6 +67,11 @@ impl DatabaseRef {
         inner.players.get(&itsf_id).map(|player| player.clone())
     }
 
+    pub fn get_player_ids(&self) -> Vec<i32> {
+        let inner = self.inner.lock().unwrap();
+        inner.players.keys().map(|id| *id).collect()
+    }
+
     pub fn add_player(&self, player: Player) {
         let mut inner = self.inner.lock().unwrap();
         inner.db.borrow_mut().write_player_json(player.itsf_id, &player);
