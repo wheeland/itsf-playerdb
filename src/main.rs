@@ -147,8 +147,9 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
 
     let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
+    let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing");
     let state = AppState {
-        data: data::DatabaseRef::load(&database_path),
+        data: data::DatabaseRef::load(&database_path, &images_path),
         download: Mutex::new(Weak::new()),
     };
     let state = web::Data::new(state);

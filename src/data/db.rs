@@ -14,14 +14,6 @@ struct DbPlayer {
     json_data: Vec<u8>,
 }
 
-#[derive(Queryable, Insertable, AsChangeset)]
-#[table_name = "player_images"]
-struct DbPlayerImage {
-    itsf_id: i32,
-    image_data: Vec<u8>,
-    image_format: String,
-}
-
 pub struct DbConnection {
     conn: SqliteConnection,
 }
@@ -79,42 +71,5 @@ impl DbConnection {
                 .map_err(|err| format!("JSON Error when loading player {}: {}", itsf_id, err)),
             None => Err(format!("No player data found for player {}", itsf_id)),
         }
-    }
-
-    pub fn write_player_image(&mut self, image: &PlayerImage) {
-        let player_image = DbPlayerImage {
-            itsf_id: image.itsf_id,
-            image_data: image.image_data.clone(),
-            image_format: image.image_format.clone(),
-        };
-
-        use crate::schema::player_images::dsl;
-
-        let result = diesel::insert_into(dsl::player_images)
-            .values(&player_image)
-            .on_conflict(dsl::itsf_id)
-            .do_update()
-            .set(&player_image)
-            .execute(&mut self.conn);
-
-        let result = expect_result(result);
-        if result != 1 {
-            panic!("invalid query result for player image insert: {}", result);
-        }
-    }
-
-    pub fn read_player_image(&mut self, itsf_id: i32) -> Option<PlayerImage> {
-        use crate::schema::player_images::dsl;
-
-        let player_image = dsl::player_images
-            .filter(dsl::itsf_id.eq(itsf_id))
-            .first::<DbPlayerImage>(&mut self.conn)
-            .optional();
-
-        expect_result(player_image).map(|player_image| PlayerImage {
-            itsf_id,
-            image_data: player_image.image_data,
-            image_format: player_image.image_format,
-        })
     }
 }

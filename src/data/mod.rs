@@ -39,11 +39,12 @@ struct DatabaseInner {
 
 #[derive(Clone)]
 pub struct DatabaseRef {
+    image_directory: String,
     inner: Arc<Mutex<DatabaseInner>>,
 }
 
 impl DatabaseRef {
-    pub fn load(path: &str) -> Self {
+    pub fn load(path: &str, image_directory: &str) -> Self {
         let mut db = db::DbConnection::open(path);
         let mut players = HashMap::new();
 
@@ -51,14 +52,19 @@ impl DatabaseRef {
             let player = db.read_player_json(player_id).expect("failed to read player");
             players.insert(player_id, player);
         }
+        log::error!("Loaded {} players", players.len());
 
         let inner = DatabaseInner {
             db: RefCell::new(db),
             players,
         };
 
+        let path = std::fs::metadata(image_directory).expect(&format!("Can't open {}", image_directory));
+        assert!(path.is_dir(), "Not a directory: {}", image_directory);
+
         Self {
             inner: Arc::new(Mutex::new(inner)),
+            image_directory: String::from(image_directory),
         }
     }
 
@@ -79,14 +85,19 @@ impl DatabaseRef {
     }
 
     pub fn get_player_image(&self, itsf_id: i32) -> Option<PlayerImage> {
-        let inner = self.inner.lock().unwrap();
-        let mut db = inner.db.borrow_mut();
-        db.read_player_image(itsf_id)
+        let path = format!("{}/{}.jpg", self.image_directory, itsf_id);
+        std::fs::read(&path).ok().map(|image_data| {
+            PlayerImage {
+                itsf_id,
+                image_data,
+                image_format: String::from("jpg"),
+            }
+        })
     }
 
     pub fn set_player_image(&self, player_image: PlayerImage) {
-        let inner = self.inner.lock().unwrap();
-        inner.db.borrow_mut().write_player_image(&player_image);
+        let path = format!("{}/{}.jpg", self.image_directory, player_image.itsf_id);
+        std::fs::write(&path, player_image.image_data).expect(&format!("Failed to write {}", path));
     }
 
     fn modify_player<F>(&self, itsf_id: i32, f: F)
