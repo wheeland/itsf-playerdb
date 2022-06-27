@@ -105,7 +105,7 @@ async fn download_itsf_single(data: web::Data<AppState>, year: web::Path<i32>) -
 
 #[actix_web::get("/download_itsf_all")]
 async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let years = (2010..2022).collect();
+    let years = (2010..2023).collect();
     download_itsf(data, years)
 }
 
@@ -137,7 +137,7 @@ async fn download_dtfb_single(data: web::Data<AppState>, season: web::Path<i32>)
 
 #[actix_web::get("/download_dtfb_all")]
 async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let seasons = (2010..2022).collect();
+    let seasons = (2010..2023).collect();
     download_dtfb(data, seasons)
 }
 
