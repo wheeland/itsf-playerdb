@@ -35,7 +35,7 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
 
     match data.data.get_player(itsf_lic) {
         Some(player) => {
-            let player = PlayerJson {
+            let mut player = PlayerJson {
                 first_name: player.first_name,
                 last_name: player.last_name,
                 birth_year: player.birth_year,
@@ -46,6 +46,11 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
                 dm_placements: player.dtfb_championship_results,
                 dtfl_teams: player.dtfb_league_teams,
             };
+
+            player.itsf_rankings.retain(|ranking| ranking.class != itsf::RankingClass::Combined);
+            player.itsf_rankings.sort_by(|a, b| b.year.cmp(&a.year));
+            player.dtfb_rankings.sort_by(|a, b| b.year.cmp(&a.year));
+            player.dm_placements.sort_by(|a, b| b.year.cmp(&a.year));
 
             Ok(HttpResponse::Ok().json(json::ok(player)))
         }
