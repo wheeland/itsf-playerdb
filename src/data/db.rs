@@ -8,7 +8,7 @@ use crate::schema::*;
 use super::PlayerImage;
 
 #[derive(Queryable, Insertable, AsChangeset)]
-#[table_name = "players"]
+#[diesel(table_name = players)]
 struct DbPlayer {
     itsf_id: i32,
     json_data: Vec<u8>,
