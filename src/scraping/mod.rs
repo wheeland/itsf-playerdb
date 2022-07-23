@@ -85,6 +85,7 @@ async fn do_itsf_rankings_downloads(
     categories: Vec<itsf::RankingCategory>,
     classes: Vec<itsf::RankingClass>,
     progress: Arc<BackgroundOperationProgress>,
+    max_rank: usize,
 ) -> Result<(), String> {
     for year in years {
         for category in categories.iter().cloned() {
@@ -96,7 +97,7 @@ async fn do_itsf_rankings_downloads(
                     class
                 );
 
-                let rankings = itsf_rankings::download(year, category, class, 200).await?;
+                let rankings = itsf_rankings::download(year, category, class, max_rank).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
                 download_itsf_players(db, &itsf_player_ids, progress.clone()).await?;
@@ -123,10 +124,11 @@ pub fn start_itsf_rankings_download(
     years: Vec<i32>,
     categories: Vec<itsf::RankingCategory>,
     classes: Vec<itsf::RankingClass>,
+    max_rank: usize,
 ) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("ITSF Rankings Download", 1);
     tokio::spawn(async move {
-        match do_itsf_rankings_downloads(&db, years, categories, classes, arc.clone()).await {
+        match do_itsf_rankings_downloads(&db, years, categories, classes, arc.clone(), max_rank).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to download ITSF rankings: {}", err),
         };
@@ -139,6 +141,7 @@ async fn do_dtfb_rankings_download(
     db: DatabaseRef,
     seasons: Vec<i32>,
     progress: Arc<BackgroundOperationProgress>,
+    max_rank: usize,
 ) -> Result<(), String> {
     log::error!("[DTFB] starting download of DTFB rankings for seasons {:?}", seasons);
 
@@ -147,7 +150,7 @@ async fn do_dtfb_rankings_download(
     for season in seasons {
         let ranking_ids = dtfb_players::collect_dtfb_rankings_for_season(season).await?;
         for ranking_id in ranking_ids {
-            let rankings = dtfb_players::collect_dtfb_ids_from_rankings(ranking_id, 200).await?;
+            let rankings = dtfb_players::collect_dtfb_ids_from_rankings(ranking_id, max_rank).await?;
             for id in rankings {
                 dtfb_player_ids.insert(id);
             }
@@ -218,10 +221,14 @@ async fn do_dtfb_rankings_download(
     Ok(())
 }
 
-pub fn start_dtfb_rankings_download(db: DatabaseRef, seasons: Vec<i32>) -> Weak<BackgroundOperationProgress> {
+pub fn start_dtfb_rankings_download(
+    db: DatabaseRef, 
+    seasons: Vec<i32>, 
+    max_rank: usize
+) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("DTFB Rankings Download", 1);
     tokio::spawn(async move {
-        match do_dtfb_rankings_download(db, seasons, arc.clone()).await {
+        match do_dtfb_rankings_download(db, seasons, arc.clone(), max_rank).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to download DTFB rankings: {}", err),
         };

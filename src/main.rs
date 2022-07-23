@@ -91,7 +91,7 @@ fn download_itsf(data: web::Data<AppState>, years: Vec<i32>) -> Result<HttpRespo
         itsf::RankingClass::Doubles,
         itsf::RankingClass::Combined,
     ];
-    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes);
+    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes, 200);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -124,7 +124,7 @@ fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>) -> Result<HttpRes
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons);
+    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons, 200);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
