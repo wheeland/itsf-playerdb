@@ -51,7 +51,7 @@ async fn download_itsf_players(
                 match player {
                     Ok(player) => {
                         progress.log(format!(
-                            "[ITSF] Downloaded player info for {}: {} {} ({:?}, {:?})",
+                            "[ITSF] .. downloaded player info for ID={}: {} {} ({:?}, {:?})",
                             player.itsf_id,
                             player.first_name,
                             player.last_name,
@@ -73,7 +73,7 @@ async fn download_itsf_players(
             }
         }
 
-        progress.log(format!("[ITSF] ... done"));
+        progress.log(format!("[ITSF] Done"));
     }
 
     Ok(())
@@ -90,13 +90,7 @@ async fn do_itsf_rankings_downloads(
     for year in years {
         for category in categories.iter().cloned() {
             for class in classes.iter().cloned() {
-                log::error!(
-                    "starting download of ITSF rankings for {}, {:?}, {:?}",
-                    year,
-                    category,
-                    class
-                );
-
+                progress.log(format!("[ITSF] Scraping ITSF rankings for {}, {:?}, {:?}", year, category, class));
                 let rankings = itsf_rankings::download(year, category, class, max_rank).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
@@ -143,7 +137,7 @@ async fn do_dtfb_rankings_download(
     progress: Arc<BackgroundOperationProgress>,
     max_rank: usize,
 ) -> Result<(), String> {
-    log::error!("[DTFB] starting download of DTFB rankings for seasons {:?}", seasons);
+    progress.log(format!("[DTFB] starting download of DTFB rankings for seasons {:?}", seasons));
 
     let mut dtfb_player_ids = HashSet::new();
 
@@ -157,7 +151,7 @@ async fn do_dtfb_rankings_download(
         }
     }
 
-    log::error!("[DTFB] downloading {} players", dtfb_player_ids.len());
+    progress.log(format!("[DTFB] Downloading {} players", dtfb_player_ids.len()));
 
     let mut dtfb_player_ids: Vec<i32> = dtfb_player_ids.into_iter().collect();
     let mut dtfb_players = Vec::new();
@@ -175,7 +169,7 @@ async fn do_dtfb_rankings_download(
         for dtfb_player in join_all(player_futures).await {
             if let Ok(dtfb_player) = dtfb_player {
                 progress.log(format!(
-                    "[DTFB] Downloaded player info for DTFB={}, ITSF={}",
+                    "[DTFB] .. downloaded player info for DTFB={}, ITSF={}",
                     dtfb_player.dtfb_id, dtfb_player.itsf_id,
                 ));
                 dtfb_players.push(dtfb_player);
@@ -217,6 +211,8 @@ async fn do_dtfb_rankings_download(
             db.add_player_dtfb_team(dtfb_player.itsf_id, team.0, team.1.clone());
         }
     }
+
+    progress.log(format!("[DTFB] done"));
 
     Ok(())
 }
