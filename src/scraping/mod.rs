@@ -36,7 +36,7 @@ async fn download_itsf_players(
         ));
 
         // query players in sets of N, to hide ITSF server latency
-        const MAX_CONCURRENT: usize = 3;
+        const MAX_CONCURRENT: usize = 5;
         while missing_players.len() > 0 {
             let mut player_futures = Vec::new();
             let mut image_futures = Vec::new();
