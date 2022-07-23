@@ -2,10 +2,14 @@
 extern crate diesel;
 
 use crate::data::{dtfb, itsf};
+use actix_web::http::header::ContentType;
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use chrono::Datelike;
 use serde::Deserialize;
-use std::sync::{Mutex, Weak, MutexGuard};
+use std::fs::File;
+use std::io::{Cursor, Read, Write};
+use std::sync::{Mutex, MutexGuard, Weak};
+use zip::{CompressionMethod, ZipWriter};
 
 mod background;
 mod data;
@@ -18,11 +22,61 @@ struct AppState {
     download: Mutex<Weak<background::BackgroundOperationProgress>>,
 }
 impl AppState {
-    fn get_download(this: &web::Data<AppState>) -> Result<MutexGuard<Weak<background::BackgroundOperationProgress>>, Error> {
-        Ok(this.download
+    fn get_download(
+        this: &web::Data<AppState>,
+    ) -> Result<MutexGuard<Weak<background::BackgroundOperationProgress>>, Error> {
+        Ok(this
+            .download
             .lock()
-            .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?
-        )
+            .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?)
+    }
+}
+
+fn add_zip_file(
+    writer: &mut ZipWriter<Cursor<&mut Vec<u8>>>,
+    compression: CompressionMethod,
+    path: &str,
+) -> Result<(), ()> {
+    let mut f = File::open(path).map_err(|_| ())?;
+    let mut data = Vec::new();
+    f.read_to_end(&mut data).map_err(|_| ())?;
+
+    let options = zip::write::FileOptions::default().compression_method(compression);
+    // writer.start_file(path.split("/").last().unwrap(), options).map_err(|_| ())?;
+    writer.start_file(path, options).map_err(|_| ())?;
+    writer.write(&data).map_err(|_| ())?;
+
+    Ok(())
+}
+
+fn create_db_zip_file() -> Result<Vec<u8>, ()> {
+    let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing from environment");
+    let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing from environment");
+
+    let mut buffer = Vec::new();
+    {
+        let mut zip = ZipWriter::new(Cursor::new(&mut buffer));
+        add_zip_file(&mut zip, CompressionMethod::Deflated, &database_path)?;
+
+        let options = zip::write::FileOptions::default().compression_method(CompressionMethod::Stored);
+        zip.add_directory("images", options).map_err(|_| ())?;
+
+        let dir = std::fs::read_dir(images_path).map_err(|_| ())?;
+        for file in dir {
+            let file = file.map_err(|_| ())?.path();
+            let file = file.to_str().ok_or(())?;
+            add_zip_file(&mut zip, CompressionMethod::Deflated, file)?;
+        }
+    }
+
+    Ok(buffer)
+}
+
+#[actix_web::get("/db.zip")]
+async fn download_db_zip() -> Result<HttpResponse, Error> {
+    match create_db_zip_file() {
+        Ok(data) => Ok(HttpResponse::Ok().content_type(ContentType::octet_stream()).body(data)),
+        Err(_) => Ok(HttpResponse::InternalServerError().json(json::err("error"))),
     }
 }
 
@@ -57,7 +111,9 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
                 dtfl_teams: player.dtfb_league_teams,
             };
 
-            player.itsf_rankings.retain(|ranking| ranking.class != itsf::RankingClass::Combined);
+            player
+                .itsf_rankings
+                .retain(|ranking| ranking.class != itsf::RankingClass::Combined);
             player.itsf_rankings.sort_by(|a, b| b.year.cmp(&a.year));
             player.dtfb_rankings.sort_by(|a, b| b.year.cmp(&a.year));
             player.dm_placements.sort_by(|a, b| b.year.cmp(&a.year));
@@ -91,8 +147,14 @@ struct DownloadStatus {
 async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let download = AppState::get_download(&data)?;
     let status = match download.upgrade() {
-        Some(download) => DownloadStatus { running: true, log: download.get_log() },
-        None => DownloadStatus { running: false, log: Vec::new() },
+        Some(download) => DownloadStatus {
+            running: true,
+            log: download.get_log(),
+        },
+        None => DownloadStatus {
+            running: false,
+            log: Vec::new(),
+        },
     };
     Ok(HttpResponse::BadRequest().json(json::ok(status)))
 }
@@ -130,19 +192,23 @@ impl DownloadParams {
         let min_year = 2010;
         let curr_year = chrono::Utc::today().naive_local().year();
         match &self.year {
-            Some(year_str) => {
-                year_str
-                    .parse::<i32>()
-                    .ok()
-                    .and_then(|year| if year >= min_year && year <= curr_year { Some(year) } else { None })
-            },
+            Some(year_str) => year_str.parse::<i32>().ok().and_then(|year| {
+                if year >= min_year && year <= curr_year {
+                    Some(year)
+                } else {
+                    None
+                }
+            }),
             None => Some(curr_year),
         }
     }
 }
 
 #[actix_web::get("/download_itsf")]
-async fn download_itsf_single(data: web::Data<AppState>, params: web::Query<DownloadParams>) -> Result<HttpResponse, Error> {
+async fn download_itsf_single(
+    data: web::Data<AppState>,
+    params: web::Query<DownloadParams>,
+) -> Result<HttpResponse, Error> {
     let max_rank = params.max_rank.unwrap_or(1000);
     match params.parse_year() {
         Some(year) => download_itsf(data, vec![year], max_rank),
@@ -153,7 +219,7 @@ async fn download_itsf_single(data: web::Data<AppState>, params: web::Query<Down
 #[actix_web::get("/download_itsf_all")]
 async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let curr_year = chrono::Utc::today().naive_local().year();
-    let years = (2010..curr_year+1).collect();
+    let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
     download_itsf(data, years, max_rank)
 }
@@ -170,7 +236,10 @@ fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) 
 }
 
 #[actix_web::get("/download_dtfb")]
-async fn download_dtfb_single(data: web::Data<AppState>, params: web::Query<DownloadParams>) -> Result<HttpResponse, Error> {
+async fn download_dtfb_single(
+    data: web::Data<AppState>,
+    params: web::Query<DownloadParams>,
+) -> Result<HttpResponse, Error> {
     let max_rank = params.max_rank.unwrap_or(1000);
     match params.parse_year() {
         Some(year) => download_dtfb(data, vec![year], max_rank),
@@ -181,7 +250,7 @@ async fn download_dtfb_single(data: web::Data<AppState>, params: web::Query<Down
 #[actix_web::get("/download_dtfb_all")]
 async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let curr_year = chrono::Utc::today().naive_local().year();
-    let years = (2010..curr_year+1).collect();
+    let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
     download_dtfb(data, years, max_rank)
 }
@@ -207,6 +276,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .app_data(state.clone())
+            .service(download_db_zip)
             .service(get_player)
             .service(get_player_image)
             .service(download_status)

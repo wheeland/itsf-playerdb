@@ -36,18 +36,25 @@ impl PlayerCategory {
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 #[repr(i8)]
 pub enum RankingCategory {
-    #[serde(rename = "open")] Open,
-    #[serde(rename = "women")] Women,
-    #[serde(rename = "junior")] Junior,
-    #[serde(rename = "senior")] Senior,
+    #[serde(rename = "open")]
+    Open,
+    #[serde(rename = "women")]
+    Women,
+    #[serde(rename = "junior")]
+    Junior,
+    #[serde(rename = "senior")]
+    Senior,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(i8)]
 pub enum RankingClass {
-    #[serde(rename = "singles")] Singles,
-    #[serde(rename = "doubles")] Doubles,
-    #[serde(rename = "combined")] Combined,
+    #[serde(rename = "singles")]
+    Singles,
+    #[serde(rename = "doubles")]
+    Doubles,
+    #[serde(rename = "combined")]
+    Combined,
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]

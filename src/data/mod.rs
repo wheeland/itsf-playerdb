@@ -86,12 +86,10 @@ impl DatabaseRef {
 
     pub fn get_player_image(&self, itsf_id: i32) -> Option<PlayerImage> {
         let path = format!("{}/{}.jpg", self.image_directory, itsf_id);
-        std::fs::read(&path).ok().map(|image_data| {
-            PlayerImage {
-                itsf_id,
-                image_data,
-                image_format: String::from("jpg"),
-            }
+        std::fs::read(&path).ok().map(|image_data| PlayerImage {
+            itsf_id,
+            image_data,
+            image_format: String::from("jpg"),
         })
     }
 

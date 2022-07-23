@@ -1,5 +1,5 @@
-use scraper::Html;
 use reqwest::Client;
+use scraper::Html;
 
 async fn get(url: &str, headers: &[(&str, &str)]) -> Result<String, reqwest::Error> {
     let client = Client::builder().cookie_store(true).build()?;

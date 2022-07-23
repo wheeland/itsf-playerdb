@@ -90,7 +90,10 @@ async fn do_itsf_rankings_downloads(
     for year in years {
         for category in categories.iter().cloned() {
             for class in classes.iter().cloned() {
-                progress.log(format!("[ITSF] Scraping ITSF rankings for {}, {:?}, {:?}", year, category, class));
+                progress.log(format!(
+                    "[ITSF] Scraping ITSF rankings for {}, {:?}, {:?}",
+                    year, category, class
+                ));
                 let rankings = itsf_rankings::download(year, category, class, max_rank).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
@@ -137,7 +140,10 @@ async fn do_dtfb_rankings_download(
     progress: Arc<BackgroundOperationProgress>,
     max_rank: usize,
 ) -> Result<(), String> {
-    progress.log(format!("[DTFB] starting download of DTFB rankings for seasons {:?}", seasons));
+    progress.log(format!(
+        "[DTFB] starting download of DTFB rankings for seasons {:?}",
+        seasons
+    ));
 
     let mut dtfb_player_ids = HashSet::new();
 
@@ -218,9 +224,9 @@ async fn do_dtfb_rankings_download(
 }
 
 pub fn start_dtfb_rankings_download(
-    db: DatabaseRef, 
-    seasons: Vec<i32>, 
-    max_rank: usize
+    db: DatabaseRef,
+    seasons: Vec<i32>,
+    max_rank: usize,
 ) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("DTFB Rankings Download", 1);
     tokio::spawn(async move {

@@ -1,17 +1,23 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(i8)]
 pub enum ChampionshipCategory {
-    #[serde(rename = "men")] Men,
-    #[serde(rename = "women")] Women,
-    #[serde(rename = "junior")] Junior,
-    #[serde(rename = "senior")] Senior,
+    #[serde(rename = "men")]
+    Men,
+    #[serde(rename = "women")]
+    Women,
+    #[serde(rename = "junior")]
+    Junior,
+    #[serde(rename = "senior")]
+    Senior,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(i8)]
 pub enum ChampionshipClass {
-    #[serde(rename = "singles")] Singles,
-    #[serde(rename = "doubles")] Doubles,
+    #[serde(rename = "singles")]
+    Singles,
+    #[serde(rename = "doubles")]
+    Doubles,
 }
 
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]

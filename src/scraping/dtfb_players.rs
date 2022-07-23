@@ -68,8 +68,7 @@ fn int(json: &serde_json::Value, name: &str) -> Result<i32, String> {
     if let Some(int) = value.as_i64() {
         Ok(int as i32)
     } else if let Some(st) = value.as_str() {
-        st.parse::<i32>()
-            .map_err(|_| format!("not an int: {}: '{}'", name, st))
+        st.parse::<i32>().map_err(|_| format!("not an int: {}: '{}'", name, st))
     } else {
         Err(format!("not an int: {}", name))
     }
@@ -182,6 +181,8 @@ impl DtfbPlayerInfo {
     }
 
     pub async fn download(dtfb_id: i32) -> Result<Self, String> {
-        Self::try_download(dtfb_id).await.map_err(|err| format!("DTFB={}: {}", dtfb_id, err))
+        Self::try_download(dtfb_id)
+            .await
+            .map_err(|err| format!("DTFB={}: {}", dtfb_id, err))
     }
 }
