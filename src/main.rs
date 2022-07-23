@@ -3,7 +3,9 @@ extern crate diesel;
 
 use crate::data::{dtfb, itsf};
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
-use std::sync::{Mutex, Weak};
+use chrono::Datelike;
+use serde::Deserialize;
+use std::sync::{Mutex, Weak, MutexGuard};
 
 mod background;
 mod data;
@@ -14,6 +16,14 @@ mod scraping;
 struct AppState {
     data: data::DatabaseRef,
     download: Mutex<Weak<background::BackgroundOperationProgress>>,
+}
+impl AppState {
+    fn get_download(this: &web::Data<AppState>) -> Result<MutexGuard<Weak<background::BackgroundOperationProgress>>, Error> {
+        Ok(this.download
+            .lock()
+            .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?
+        )
+    }
 }
 
 #[actix_web::get("/player/{itsf_lic}")]
@@ -70,12 +80,24 @@ async fn get_player_image(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -
     }
 }
 
-fn download_itsf(data: web::Data<AppState>, years: Vec<i32>) -> Result<HttpResponse, Error> {
-    let mut download = data
-        .download
-        .lock()
-        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
+#[derive(serde::Serialize)]
+struct DownloadStatus {
+    running: bool,
+    log: Vec<String>,
+}
 
+#[actix_web::get("/player/download_status")]
+async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    let download = AppState::get_download(&data)?;
+    let status = match download.upgrade() {
+        Some(download) => DownloadStatus { running: true, log: download.get_log() },
+        None => DownloadStatus { running: false, log: Vec::new() },
+    };
+    Ok(HttpResponse::BadRequest().json(json::ok(status)))
+}
+
+fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
+    let mut download = AppState::get_download(&data)?;
     if let Some(_) = download.upgrade() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
@@ -91,59 +113,76 @@ fn download_itsf(data: web::Data<AppState>, years: Vec<i32>) -> Result<HttpRespo
         itsf::RankingClass::Doubles,
         itsf::RankingClass::Combined,
     ];
-    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes, 200);
+    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes, max_rank);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
 
-#[actix_web::get("/download_itsf/{year}")]
-async fn download_itsf_single(data: web::Data<AppState>, year: web::Path<i32>) -> Result<HttpResponse, Error> {
-    let year = year.into_inner();
-    let year = if year > 2006 {
-        year
-    } else {
-        return Ok(HttpResponse::BadRequest().json(json::err("Invalid year")));
-    };
+#[derive(Deserialize)]
+struct DownloadParams {
+    year: Option<String>,
+    max_rank: Option<usize>,
+}
 
-    download_itsf(data, vec![year])
+impl DownloadParams {
+    fn parse_year(&self) -> Option<i32> {
+        let min_year = 2010;
+        let curr_year = chrono::Utc::today().naive_local().year();
+        match &self.year {
+            Some(year_str) => {
+                year_str
+                    .parse::<i32>()
+                    .ok()
+                    .and_then(|year| if year >= min_year && year <= curr_year { Some(year) } else { None })
+            },
+            None => Some(curr_year),
+        }
+    }
+}
+
+#[actix_web::get("/download_itsf")]
+async fn download_itsf_single(data: web::Data<AppState>, params: web::Query<DownloadParams>) -> Result<HttpResponse, Error> {
+    let max_rank = params.max_rank.unwrap_or(1000);
+    match params.parse_year() {
+        Some(year) => download_itsf(data, vec![year], max_rank),
+        None => Ok(HttpResponse::BadRequest().json(json::err("invalid year"))),
+    }
 }
 
 #[actix_web::get("/download_itsf_all")]
 async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let years = (2010..2023).collect();
-    download_itsf(data, years)
+    let curr_year = chrono::Utc::today().naive_local().year();
+    let years = (2010..curr_year+1).collect();
+    let max_rank = 1000;
+    download_itsf(data, years, max_rank)
 }
 
-fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>) -> Result<HttpResponse, Error> {
-    let mut download = data
-        .download
-        .lock()
-        .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?;
-
+fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
+    let mut download = AppState::get_download(&data)?;
     if let Some(_) = download.upgrade() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons, 200);
+    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons, max_rank);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
 
-#[actix_web::get("/download_dtfb/{season}")]
-async fn download_dtfb_single(data: web::Data<AppState>, season: web::Path<i32>) -> Result<HttpResponse, Error> {
-    let season = season.into_inner();
-    let season = if season > 2008 {
-        season
-    } else {
-        return Ok(HttpResponse::BadRequest().json(json::err("Invalid season")));
-    };
-    download_dtfb(data, vec![season])
+#[actix_web::get("/download_dtfb")]
+async fn download_dtfb_single(data: web::Data<AppState>, params: web::Query<DownloadParams>) -> Result<HttpResponse, Error> {
+    let max_rank = params.max_rank.unwrap_or(1000);
+    match params.parse_year() {
+        Some(year) => download_dtfb(data, vec![year], max_rank),
+        None => Ok(HttpResponse::BadRequest().json(json::err("invalid year"))),
+    }
 }
 
 #[actix_web::get("/download_dtfb_all")]
 async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let seasons = (2010..2023).collect();
-    download_dtfb(data, seasons)
+    let curr_year = chrono::Utc::today().naive_local().year();
+    let years = (2010..curr_year+1).collect();
+    let max_rank = 1000;
+    download_dtfb(data, years, max_rank)
 }
 
 #[actix_web::main]
@@ -169,6 +208,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(state.clone())
             .service(get_player)
             .service(get_player_image)
+            .service(download_status)
             .service(download_itsf_single)
             .service(download_all_itsf)
             .service(download_dtfb_single)
