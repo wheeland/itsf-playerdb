@@ -40,3 +40,9 @@ impl NationalRanking {
         self.year == other_ranking.year && self.category == other_ranking.category
     }
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NationalTeam {
+    pub year: i32,
+    pub name: String,
+}

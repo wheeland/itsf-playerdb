@@ -23,7 +23,7 @@ pub struct Player {
     pub dtfb_id: Option<i32>,
     pub dtfb_national_rankings: Vec<dtfb::NationalRanking>,
     pub dtfb_championship_results: Vec<dtfb::NationalChampionshipResult>,
-    pub dtfb_league_teams: Vec<(i32, String)>,
+    pub dtfb_league_teams: Vec<dtfb::NationalTeam>,
 }
 
 pub struct PlayerImage {
@@ -142,10 +142,10 @@ impl DatabaseRef {
         });
     }
 
-    pub fn add_player_dtfb_team(&self, itsf_id: i32, year: i32, team: String) {
+    pub fn add_player_dtfb_team(&self, itsf_id: i32, year: i32, name: String) {
         self.modify_player(itsf_id, |player| {
-            player.dtfb_league_teams.retain(|t| t.0 != year);
-            player.dtfb_league_teams.push((year, team));
+            player.dtfb_league_teams.retain(|t| t.year != year);
+            player.dtfb_league_teams.push(dtfb::NationalTeam { year, name });
         });
     }
 }

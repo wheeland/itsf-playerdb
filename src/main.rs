@@ -40,7 +40,7 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
         pub itsf_rankings: Vec<itsf::Ranking>,
         pub dtfb_rankings: Vec<dtfb::NationalRanking>,
         pub dm_placements: Vec<dtfb::NationalChampionshipResult>,
-        pub dtfl_teams: Vec<(i32, String)>,
+        pub dtfl_teams: Vec<dtfb::NationalTeam>,
     }
 
     match data.data.get_player(itsf_lic) {
@@ -61,6 +61,7 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
             player.itsf_rankings.sort_by(|a, b| b.year.cmp(&a.year));
             player.dtfb_rankings.sort_by(|a, b| b.year.cmp(&a.year));
             player.dm_placements.sort_by(|a, b| b.year.cmp(&a.year));
+            player.dtfl_teams.sort_by(|a, b| b.year.cmp(&a.year));
 
             Ok(HttpResponse::Ok().json(json::ok(player)))
         }
