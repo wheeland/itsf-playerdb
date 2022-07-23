@@ -151,8 +151,10 @@ async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
     env_logger::init();
 
-    let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing");
-    let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing");
+    let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing from environment");
+    let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing from environment");
+    let port = std::env::var("SERVER_PORT").expect("SERVER_PORT missing from environment");
+    let port = port.parse::<u16>().expect("invalid SERVER_PORT");
     let state = AppState {
         data: data::DatabaseRef::load(&database_path, &images_path),
         download: Mutex::new(Weak::new()),
@@ -172,7 +174,7 @@ async fn main() -> std::io::Result<()> {
             .service(download_dtfb_single)
             .service(download_dtfb_all)
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await
 }
