@@ -87,7 +87,7 @@ struct DownloadStatus {
     log: Vec<String>,
 }
 
-#[actix_web::get("/player/download_status")]
+#[actix_web::get("/download_status")]
 async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let download = AppState::get_download(&data)?;
     let status = match download.upgrade() {
