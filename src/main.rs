@@ -6,10 +6,7 @@ use actix_web::http::header::ContentType;
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use chrono::Datelike;
 use serde::Deserialize;
-use std::fs::File;
-use std::io::{Cursor, Read, Write};
 use std::sync::{Mutex, MutexGuard, Weak};
-use zip::{CompressionMethod, ZipWriter};
 
 mod background;
 mod data;
@@ -32,49 +29,9 @@ impl AppState {
     }
 }
 
-fn add_zip_file(
-    writer: &mut ZipWriter<Cursor<&mut Vec<u8>>>,
-    compression: CompressionMethod,
-    path: &str,
-) -> Result<(), ()> {
-    let mut f = File::open(path).map_err(|_| ())?;
-    let mut data = Vec::new();
-    f.read_to_end(&mut data).map_err(|_| ())?;
-
-    let options = zip::write::FileOptions::default().compression_method(compression);
-    // writer.start_file(path.split("/").last().unwrap(), options).map_err(|_| ())?;
-    writer.start_file(path, options).map_err(|_| ())?;
-    writer.write(&data).map_err(|_| ())?;
-
-    Ok(())
-}
-
-fn create_db_zip_file() -> Result<Vec<u8>, ()> {
-    let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing from environment");
-    let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing from environment");
-
-    let mut buffer = Vec::new();
-    {
-        let mut zip = ZipWriter::new(Cursor::new(&mut buffer));
-        add_zip_file(&mut zip, CompressionMethod::Deflated, &database_path)?;
-
-        let options = zip::write::FileOptions::default().compression_method(CompressionMethod::Stored);
-        zip.add_directory("images", options).map_err(|_| ())?;
-
-        let dir = std::fs::read_dir(images_path).map_err(|_| ())?;
-        for file in dir {
-            let file = file.map_err(|_| ())?.path();
-            let file = file.to_str().ok_or(())?;
-            add_zip_file(&mut zip, CompressionMethod::Deflated, file)?;
-        }
-    }
-
-    Ok(buffer)
-}
-
 #[actix_web::get("/db.zip")]
-async fn download_db_zip() -> Result<HttpResponse, Error> {
-    match create_db_zip_file() {
+async fn download_db_zip(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    match data.data.create_zip_file() {
         Ok(data) => Ok(HttpResponse::Ok().content_type(ContentType::octet_stream()).body(data)),
         Err(_) => Ok(HttpResponse::InternalServerError().json(json::err("error"))),
     }
