@@ -20,8 +20,12 @@
             players.sort(function(a, b) { return (a.last_name < b.last_name) ? -1 : 1; });
         }
 
-        function updatePlayerTable(player_data) {
+        function updatePlayerTable() {
             var table = document.getElementById("players");
+
+            for (var i = table.rows.length - 1; i > 0; i--)
+                table.deleteRow(i);
+
             for (var i = 0; i < players.length; ++i) {
                 var row = table.insertRow();
                 row.className = "playertable";
@@ -43,7 +47,7 @@
                 if (this.readyState == 4 && this.status == 200) {
                     let json = JSON.parse(this.responseText);
                     players = json.data;
-                    sortByFirstName();
+                    sortById();
                     updatePlayerTable(json.data);
                 }
             }
@@ -65,6 +69,14 @@
                 <col span="1" style="width: 40%;">
                 <col span="1" style="width: 40%;">
             </colgroup>
+
+            <tr class="playertable">
+                <td class="playertable"> <button onclick="sortById(); updatePlayerTable();"> Sort by ID </button> </td>
+                <td class="playertable"> <button onclick="sortByFirstName(); updatePlayerTable();"> Sort by First Name </button> </td>
+                <td class="playertable"> <button onclick="sortByLastName(); updatePlayerTable();"> Sort by Last Name </button> </td>
+            </tr>
+
+
         </table>
 
     </body>
