@@ -6,3 +6,8 @@ body {
     border: 2px outset black;
     background-color: #D7D7D7;
 }
+
+.playertable {
+    border: 1px solid;
+    border-collapse: collapse;
+}

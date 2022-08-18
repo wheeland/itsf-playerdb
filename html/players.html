@@ -4,22 +4,68 @@
     <head>
         <meta charset="utf-8"/>
         <title>ITSF Player DB</title>
+        <link rel="stylesheet" href="style.css">
     </head>
 
+    <script type="text/javascript">
+        var players = [];
+
+        function sortById() {
+            players.sort(function(a, b) { return a.itsf_lic - b.itsf_lic; });
+        }
+        function sortByFirstName() {
+            players.sort(function(a, b) { return (a.first_name < b.first_name) ? -1 : 1; });
+        }
+        function sortByLastName() {
+            players.sort(function(a, b) { return (a.last_name < b.last_name) ? -1 : 1; });
+        }
+
+        function updatePlayerTable(player_data) {
+            var table = document.getElementById("players");
+            for (var i = 0; i < players.length; ++i) {
+                var row = table.insertRow();
+                row.className = "playertable";
+                var idCell = row.insertCell();
+                var firstNameCell = row.insertCell();
+                var lastNameCell = row.insertCell();
+                idCell.className = "playertable";
+                firstNameCell.className = "playertable";
+                lastNameCell.className = "playertable";
+                idCell.appendChild(document.createTextNode(players[i].itsf_lic));
+                firstNameCell.appendChild(document.createTextNode(players[i].first_name));
+                lastNameCell.appendChild(document.createTextNode(players[i].last_name));
+            }
+        }
+
+        function updatePage() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    let json = JSON.parse(this.responseText);
+                    players = json.data;
+                    sortByFirstName();
+                    updatePlayerTable(json.data);
+                }
+            }
+            xhr.open("GET", "/listplayers", true);
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.send();
+        }
+
+        setTimeout(updatePage, 100);
+
+    </script>
+
     <body>
-        <h1>ITSF Player DB</h1>
+        <h1>ITSF Player DB: Players</h1>
 
-        <div>
-            <h3>API Endpoints</h2>
-            <p> Get Player info: <a href="/player/12345">/player/{ITSF-ID}</a> </p>
-            <p> Get Player image: <a href="/image/12345.jpg">/image/{ITSF-ID}.jpg</a> </p>
-        </div>
-
-        <div>
-            <h3>Sub-Pages</h2>
-            <p> <a href="/updates"> Update Player DB </a> </p>
-            <p> <a href="/players"> List and modify players </a> </p>
-        </div>
+        <table id="players" class="playertable">
+            <colgroup>
+                <col span="1" style="width: 20%;">
+                <col span="1" style="width: 40%;">
+                <col span="1" style="width: 40%;">
+            </colgroup>
+        </table>
 
     </body>
 
