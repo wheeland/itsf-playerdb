@@ -115,7 +115,7 @@ async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Erro
             log: Vec::new(),
         },
     };
-    Ok(HttpResponse::BadRequest().json(json::ok(status)))
+    Ok(HttpResponse::Ok().json(json::ok(status)))
 }
 
 fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
@@ -163,7 +163,7 @@ impl DownloadParams {
     }
 }
 
-#[actix_web::get("/download_itsf")]
+#[actix_web::post("/download_itsf")]
 async fn download_itsf_single(
     data: web::Data<AppState>,
     params: web::Query<DownloadParams>,
@@ -175,7 +175,7 @@ async fn download_itsf_single(
     }
 }
 
-#[actix_web::get("/download_itsf_all")]
+#[actix_web::post("/download_itsf_all")]
 async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let curr_year = chrono::Utc::today().naive_local().year();
     let years = (2010..curr_year + 1).collect();
@@ -194,7 +194,7 @@ fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
 
-#[actix_web::get("/download_dtfb")]
+#[actix_web::post("/download_dtfb")]
 async fn download_dtfb_single(
     data: web::Data<AppState>,
     params: web::Query<DownloadParams>,
@@ -206,7 +206,7 @@ async fn download_dtfb_single(
     }
 }
 
-#[actix_web::get("/download_dtfb_all")]
+#[actix_web::post("/download_dtfb_all")]
 async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let curr_year = chrono::Utc::today().naive_local().year();
     let years = (2010..curr_year + 1).collect();
@@ -241,9 +241,7 @@ async fn main() -> std::io::Result<()> {
     };
     let state = web::Data::new(state);
 
-    log::info!("Starting HTTP server at http://localhost:8080");
-
-    HttpServer::new(move || {
+    let mut server = HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .app_data(state.clone())
@@ -255,8 +253,24 @@ async fn main() -> std::io::Result<()> {
             .service(download_all_itsf)
             .service(download_dtfb_single)
             .service(download_dtfb_all)
-    })
-    .bind(("0.0.0.0", port))?
-    .run()
-    .await
+            .service(add_player_comment)
+            .service(actix_files::Files::new("", "html/").index_file("start.html"))
+    });
+    
+
+    let cert_pub = std::env::var("CERT_PUB").ok();
+    let cert_priv = std::env::var("CERT_PRIV").ok();
+    if let Some(cert) = cert_pub.zip(cert_priv) {
+        log::info!("Starting HTTPS server at http://localhost:{}", port);
+        // let server_config = rustls::ServerConfig::builder()
+        //     .with_safe_defaults()
+        //     .with_no_client_auth()
+        //     .with_single_cert(cert_chain, key_der)
+        // server_config.
+    }  else {
+        log::info!("Starting HTTP server at http://localhost:{}", port);
+        server = server.bind(("0.0.0.0", port))?;
+    }
+    
+    server.run().await
 }

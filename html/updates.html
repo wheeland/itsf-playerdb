@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="utf-8"/>
+        <title>ITSF Player DB</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+
+    <script type="text/javascript">
+        function receiveDownloadStatus(result) {
+            let data = result.data;
+            var running_update = document.getElementById("running_update");
+            var new_update = document.getElementById("new_update");
+            var running_update_log = document.getElementById("running_update_log");
+
+            if (data.running) {
+                var text = "";
+                for (var i = 0; i < data.log.length; i++) {
+                    text = text + data.log[i] + "\n";
+                }
+                running_update.style.display = "block";
+                new_update.style.display = "none";
+                running_update_log.value = text;
+                setTimeout(updatePage, 1000);
+            } else {
+                running_update.style.display = "none";
+                new_update.style.display = "block";
+            }
+        }
+
+        function updatePage() {
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    let json = JSON.parse(this.responseText);
+                    receiveDownloadStatus(json);
+                }
+            }
+            xhr.open("GET", "/download_status", true);
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.send();
+        }
+
+        function postUpdate(url) {
+            var max_rank = document.getElementById("max_rank");
+            var year = document.getElementById("year");
+            let query = "?max_rank=" + max_rank.value + "&year=" + year.value;
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", url + query, true);
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.send();
+            setTimeout(updatePage, 500);
+        }
+
+        updatePage();
+        setTimeout(updatePage, 2000);
+    </script>
+
+    <body>
+        <h1>ITSF Player DB: Database Updates</h1>
+
+        <p> <a href="/"> back to main page </a> </p>
+
+        <div id="running_update" class="box">
+            <h3>Running Update Log</h2>
+            <textarea id="running_update_log" cols=120 rows=20> </textarea>
+        </div>
+
+        <div id="new_update" class="box">
+            <h3>Start new Update</h2>
+
+            <p>
+                <label for="max_rank">Max players to update:</label>
+                <input type="number" id="max_rank" name="fname" value="1000">
+            </p>
+
+            <p>
+                <label for="year">Year to update:</label>
+                <input type="number" id="year" name="fname" min="2005" max="2030">
+            </p>
+
+            <button onclick="postUpdate('/download_dtfb')"> Update DTFB players </button>
+            <button onclick="postUpdate('/download_itsf')"> Update ITSF players </button>
+        </div>
+
+    </body>
+
+</html>
