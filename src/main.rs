@@ -52,6 +52,7 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
         pub dtfb_rankings: Vec<dtfb::NationalRanking>,
         pub dm_placements: Vec<dtfb::NationalChampionshipResult>,
         pub dtfl_teams: Vec<dtfb::NationalTeam>,
+        pub comment: String,
     }
 
     match data.data.get_player(itsf_lic) {
@@ -66,6 +67,7 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
                 dtfb_rankings: player.dtfb_national_rankings,
                 dm_placements: player.dtfb_championship_results,
                 dtfl_teams: player.dtfb_league_teams,
+                comment: player.comments.last().map(|c| c.text.clone()).unwrap_or(String::new()),
             };
 
             player
@@ -210,6 +212,18 @@ async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Er
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
     download_dtfb(data, years, max_rank)
+}
+
+#[derive(Deserialize)]
+struct AddCommentInfo {
+    itsf_lic: i32,
+    comment: String,
+}
+
+#[actix_web::post("/add_comment")]
+async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommentInfo>) -> Result<HttpResponse, Error> {
+    data.data.add_player_comment(info.itsf_lic, info.comment.clone());
+    Ok(HttpResponse::Ok().json(json::ok("added comment")))
 }
 
 #[actix_web::main]

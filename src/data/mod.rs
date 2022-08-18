@@ -5,11 +5,18 @@ use std::{
 };
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
+use chrono::TimeZone;
 use zip::{CompressionMethod, ZipWriter};
 
 mod db;
 pub mod dtfb;
 pub mod itsf;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PlayerComment {
+    pub timestamp: u32,
+    pub text: String,
+}
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Player {
@@ -27,6 +34,9 @@ pub struct Player {
     pub dtfb_national_rankings: Vec<dtfb::NationalRanking>,
     pub dtfb_championship_results: Vec<dtfb::NationalChampionshipResult>,
     pub dtfb_league_teams: Vec<dtfb::NationalTeam>,
+
+    #[serde(default)]
+    pub comments: Vec<PlayerComment>,
 }
 
 pub struct PlayerImage {
@@ -166,6 +176,14 @@ impl DatabaseRef {
         self.modify_player(itsf_id, |player| {
             player.dtfb_league_teams.retain(|t| t.year != year);
             player.dtfb_league_teams.push(dtfb::NationalTeam { year, name });
+        });
+    }
+
+    pub fn add_player_comment(&self, itsf_id: i32, text: String) {
+        self.modify_player(itsf_id, |player| {
+            let timestamp = chrono::Utc::now().naive_local().timestamp() as u32;
+            player.comments.push(PlayerComment { timestamp, text });
+            player.comments.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
         });
     }
 

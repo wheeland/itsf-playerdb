@@ -101,6 +101,7 @@ fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
         dtfb_championship_results: Vec::new(),
         dtfb_national_rankings: Vec::new(),
         dtfb_league_teams: Vec::new(),
+        comments: Vec::new(),
     })
 }
 
