@@ -84,6 +84,28 @@ async fn get_player(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Resu
     }
 }
 
+#[actix_web::get("/listplayers")]
+async fn list_players(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+    #[derive(serde::Serialize)]
+    struct PlayerData {
+        pub itsf_lic: i32,
+        pub first_name: String,
+        pub last_name: String,
+    };
+    
+    let ids = data.data.get_player_ids();
+    let players: Vec<PlayerData> = ids.iter().map(|itsf_lic| {
+        let player = data.data.get_player(*itsf_lic).unwrap();
+        PlayerData {
+            itsf_lic: *itsf_lic,
+            first_name: player.first_name,
+            last_name: player.last_name,
+        }
+    }).collect();
+
+    Ok(HttpResponse::Ok().json(json::ok(players)))
+}
+
 #[actix_web::get("/image/{itsf_lic}.jpg")]
 async fn get_player_image(data: web::Data<AppState>, itsf_lic: web::Path<i32>) -> Result<HttpResponse, Error> {
     let itsf_lic = itsf_lic.into_inner();
@@ -248,6 +270,7 @@ async fn main() -> std::io::Result<()> {
             .service(download_db_zip)
             .service(get_player)
             .service(get_player_image)
+            .service(list_players)
             .service(download_status)
             .service(download_itsf_single)
             .service(download_all_itsf)
