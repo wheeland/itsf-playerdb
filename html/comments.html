@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="utf-8"/>
+        <title>ITSF Player DB</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+
+    <script type="text/javascript">
+        function onPlayerResponse(player) {
+            var title = document.getElementById("title");
+            if (player.error) {
+                title.innerText = "No such player"
+            } else {
+                title.innerText = "ITSF Player DB: " + player.data.first_name + " " + player.data.last_name;
+                var comment = document.getElementById("comment");
+                comment.value = player.data.comment;
+            }
+        }
+
+        function sendPlayerRequest() {
+            var id = window.location.search.substring(1);
+
+            var xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    let json = JSON.parse(this.responseText);
+                    onPlayerResponse(json);
+                }
+            }
+            xhr.open("GET", "/player/" + id, true);
+            xhr.setRequestHeader("Accept", "application/json");
+            xhr.send();
+        }
+
+        function updateComment() {
+            var id = window.location.search.substring(1);
+            var comment = document.getElementById("comment").value;
+            var json = {
+                "itsf_lic": parseInt(id),
+                "comment": comment
+            };
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/add_comment");
+            xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+            xhr.send(JSON.stringify(json));
+        }
+
+        sendPlayerRequest();
+
+    </script>
+
+    <body>
+        <h1 id="title">ITSF Player DB: Player</h1>
+
+        <p> <a href="/"> back to main page </a> </p>
+        <p> <a href="/players.html"> back to player list </a> </p>
+
+        <div class="box">
+            <textarea id="comment" cols=120 rows=20> </textarea>
+            <button onclick="updateComment()">Save</button>
+        </div>
+
+    </body>
+
+</html>

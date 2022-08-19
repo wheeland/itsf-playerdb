@@ -35,7 +35,11 @@
                 idCell.className = "playertable";
                 firstNameCell.className = "playertable";
                 lastNameCell.className = "playertable";
-                idCell.appendChild(document.createTextNode(players[i].itsf_lic));
+
+                let a = document.createElement("a");
+                a.href = "/comments.html?" + players[i].itsf_lic;
+                a.appendChild(document.createTextNode(players[i].itsf_lic));
+                idCell.appendChild(a);
                 firstNameCell.appendChild(document.createTextNode(players[i].first_name));
                 lastNameCell.appendChild(document.createTextNode(players[i].last_name));
             }
@@ -63,7 +67,9 @@
     <body>
         <h1>ITSF Player DB: Players</h1>
 
-        <table id="players" class="playertable">
+        <p> <a href="/"> back to main page </a> </p>
+
+        <table id="players" class="playertable" readonly="true">
             <colgroup>
                 <col span="1" style="width: 20%;">
                 <col span="1" style="width: 40%;">
