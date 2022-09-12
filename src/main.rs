@@ -5,6 +5,7 @@ use crate::data::{dtfb, itsf};
 use actix_web::http::header::ContentType;
 use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use chrono::Datelike;
+use rustls::ServerConfig;
 use serde::Deserialize;
 use std::sync::{Mutex, MutexGuard, Weak};
 
@@ -91,7 +92,7 @@ async fn list_players(data: web::Data<AppState>) -> Result<HttpResponse, Error> 
         pub itsf_lic: i32,
         pub first_name: String,
         pub last_name: String,
-    };
+    }
     
     let ids = data.data.get_player_ids();
     let players: Vec<PlayerData> = ids.iter().map(|itsf_lic| {
@@ -248,6 +249,37 @@ async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommen
     Ok(HttpResponse::Ok().json(json::ok("added comment")))
 }
 
+fn get_rustls_config() -> Option<ServerConfig> {
+    use rustls::{Certificate, PrivateKey};
+    use rustls_pemfile::{Item, read_all};
+    use std::fs::File;
+    use std::io::BufReader;
+
+    std::env::var("CERT_PEM").ok().map(|pem| {
+        let pem = File::open(pem).expect("PEM file not found");
+        let mut pem = BufReader::new(pem);
+        let pem_sections = read_all(&mut pem).expect("Failed to parse PEM file");
+
+        let certs: Vec<Certificate> = pem_sections.iter().filter_map(|item| match item {
+            Item::X509Certificate(cert) => Some(Certificate(cert.clone())),
+            _ => None,
+        }).collect();
+        let key = pem_sections.iter().filter_map(|item| match item {
+            Item::RSAKey(key) => Some(PrivateKey(key.clone())),
+            _ => None,
+        }).next().expect("no RSA key in PEM file");
+
+        // for section in pem_sections {
+        //     println!("{:?}", section);
+        // }
+        ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .expect("Failed to initialize rustls")
+    })
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
@@ -281,15 +313,9 @@ async fn main() -> std::io::Result<()> {
     });
     
 
-    let cert_pub = std::env::var("CERT_PUB").ok();
-    let cert_priv = std::env::var("CERT_PRIV").ok();
-    if let Some(cert) = cert_pub.zip(cert_priv) {
+    if let Some(server_config) = get_rustls_config() {
         log::info!("Starting HTTPS server at http://localhost:{}", port);
-        // let server_config = rustls::ServerConfig::builder()
-        //     .with_safe_defaults()
-        //     .with_no_client_auth()
-        //     .with_single_cert(cert_chain, key_der)
-        // server_config.
+        server = server.bind_rustls(("0.0.0.0", port), server_config).expect("Failed to start actix with rustls");
     }  else {
         log::info!("Starting HTTP server at http://localhost:{}", port);
         server = server.bind(("0.0.0.0", port))?;

@@ -23,6 +23,7 @@ log = "0.4.17"
 num_enum = "0.5.7"
 reqwest = { version = "0.11.10", features = [ "cookies" ] }
 rustls = "*"
+rustls-pemfile = "*"
 scraper = "0.13.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
