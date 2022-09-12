@@ -287,6 +287,7 @@ async fn main() -> std::io::Result<()> {
 
     let database_path = std::env::var("DATABASE_URL").expect("DATABASE_URL missing from environment");
     let images_path = std::env::var("IMAGE_PATH").expect("IMAGE_PATH missing from environment");
+    let html_path = std::env::var("HTML_ROOT").expect("HTML_ROOT missing from environment");
     let port = std::env::var("SERVER_PORT").expect("SERVER_PORT missing from environment");
     let port = port.parse::<u16>().expect("invalid SERVER_PORT");
     let state = AppState {
@@ -309,7 +310,7 @@ async fn main() -> std::io::Result<()> {
             .service(download_dtfb_single)
             .service(download_dtfb_all)
             .service(add_player_comment)
-            .service(actix_files::Files::new("", "html/").index_file("start.html"))
+            .service(actix_files::Files::new("", &html_path).index_file("start.html"))
     });
     
 
