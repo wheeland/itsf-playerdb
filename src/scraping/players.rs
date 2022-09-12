@@ -12,7 +12,7 @@ fn get_div_with_class<'a>(root: &'a Html, class: &'static str) -> Vec<ElementRef
 }
 
 fn is_uppercase(word: &str) -> bool {
-    word.chars().all(|c| c.is_uppercase())
+    word.chars().all(|c| !c.is_lowercase())
 }
 
 fn to_normalcase(word: &str) -> String {
