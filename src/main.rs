@@ -3,10 +3,16 @@ extern crate diesel;
 
 use crate::data::{dtfb, itsf};
 use actix_web::http::header::ContentType;
-use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
+use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer, dev::ServiceRequest};
+use actix_web_httpauth::extractors::basic::BasicAuth;
+use actix_web_httpauth::middleware::HttpAuthentication;
 use chrono::Datelike;
+use lazy_static::lazy_static;
 use rustls::ServerConfig;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, BufRead};
 use std::sync::{Mutex, MutexGuard, Weak};
 
 mod background;
@@ -14,6 +20,31 @@ mod data;
 mod json;
 mod schema;
 mod scraping;
+
+fn load_users_file() -> HashMap<String, String> {
+    let path = std::env::var("USERS_FILE").expect("USERS_FILE missing from environment");
+    let file = File::open(path).expect("Failed to open users file");
+    let mut ret = HashMap::new();
+    for line in BufReader::new(file).lines() {
+        let line = line.expect("Failed to parse users file");
+        let parts: Vec<&str> = line.split(":").collect();
+        assert!(parts.len() == 2, "Invalid users file");
+        ret.insert(String::from(parts[0]), String::from(parts[1]));
+    }
+    ret
+}
+
+fn is_authorized(auth: BasicAuth) -> bool {
+    lazy_static! {
+        static ref USERS: HashMap<String, String> = load_users_file();
+    }
+    let user_id = auth.user_id().to_string();
+    let passwords = auth.password().zip(USERS.get(&user_id));
+    match passwords {
+        Some((pw1, pw2)) => &pw1 == &pw2,
+        None => false,
+    }
+}
 
 struct AppState {
     data: data::DatabaseRef,
@@ -190,7 +221,12 @@ impl DownloadParams {
 async fn download_itsf_single(
     data: web::Data<AppState>,
     params: web::Query<DownloadParams>,
+    auth: BasicAuth
 ) -> Result<HttpResponse, Error> {
+    if !is_authorized(auth) {
+        return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
+    }
+
     let max_rank = params.max_rank.unwrap_or(1000);
     match params.parse_year() {
         Some(year) => download_itsf(data, vec![year], max_rank),
@@ -199,7 +235,11 @@ async fn download_itsf_single(
 }
 
 #[actix_web::post("/download_itsf_all")]
-async fn download_all_itsf(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+async fn download_all_itsf(data: web::Data<AppState>, auth: BasicAuth) -> Result<HttpResponse, Error> {
+    if !is_authorized(auth) {
+        return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
+    }
+
     let curr_year = chrono::Utc::today().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
@@ -221,7 +261,12 @@ fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) 
 async fn download_dtfb_single(
     data: web::Data<AppState>,
     params: web::Query<DownloadParams>,
+    auth: BasicAuth,
 ) -> Result<HttpResponse, Error> {
+    if !is_authorized(auth) {
+        return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
+    }
+
     let max_rank = params.max_rank.unwrap_or(1000);
     match params.parse_year() {
         Some(year) => download_dtfb(data, vec![year], max_rank),
@@ -230,7 +275,11 @@ async fn download_dtfb_single(
 }
 
 #[actix_web::post("/download_dtfb_all")]
-async fn download_dtfb_all(data: web::Data<AppState>) -> Result<HttpResponse, Error> {
+async fn download_dtfb_all(data: web::Data<AppState>, auth: BasicAuth) -> Result<HttpResponse, Error> {
+    if !is_authorized(auth) {
+        return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
+    }
+
     let curr_year = chrono::Utc::today().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
@@ -244,7 +293,11 @@ struct AddCommentInfo {
 }
 
 #[actix_web::post("/add_comment")]
-async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommentInfo>) -> Result<HttpResponse, Error> {
+async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommentInfo>, auth: BasicAuth) -> Result<HttpResponse, Error> {
+    if !is_authorized(auth) {
+        return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
+    }
+
     data.data.add_player_comment(info.itsf_lic, info.comment.clone());
     Ok(HttpResponse::Ok().json(json::ok("added comment")))
 }
@@ -313,7 +366,6 @@ async fn main() -> std::io::Result<()> {
             .service(actix_files::Files::new("", &html_path).index_file("start.html"))
     });
     
-
     if let Some(server_config) = get_rustls_config() {
         log::info!("Starting HTTPS server at http://localhost:{}", port);
         server = server.bind_rustls(("0.0.0.0", port), server_config).expect("Failed to start actix with rustls");
