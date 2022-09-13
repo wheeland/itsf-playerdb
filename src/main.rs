@@ -3,9 +3,8 @@ extern crate diesel;
 
 use crate::data::{dtfb, itsf};
 use actix_web::http::header::ContentType;
-use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer, dev::ServiceRequest};
+use actix_web::{middleware::Logger, web, App, Error, HttpResponse, HttpServer};
 use actix_web_httpauth::extractors::basic::BasicAuth;
-use actix_web_httpauth::middleware::HttpAuthentication;
 use chrono::Datelike;
 use lazy_static::lazy_static;
 use rustls::ServerConfig;
@@ -305,8 +304,6 @@ async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommen
 fn get_rustls_config() -> Option<ServerConfig> {
     use rustls::{Certificate, PrivateKey};
     use rustls_pemfile::{Item, read_all};
-    use std::fs::File;
-    use std::io::BufReader;
 
     std::env::var("CERT_PEM").ok().map(|pem| {
         let pem = File::open(pem).expect("PEM file not found");
@@ -322,9 +319,6 @@ fn get_rustls_config() -> Option<ServerConfig> {
             _ => None,
         }).next().expect("no RSA key in PEM file");
 
-        // for section in pem_sections {
-        //     println!("{:?}", section);
-        // }
         ServerConfig::builder()
             .with_safe_defaults()
             .with_no_client_auth()
