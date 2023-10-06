@@ -52,11 +52,7 @@ async fn download_itsf_players(
                     Ok(player) => {
                         progress.log(format!(
                             "[ITSF] .. downloaded player info for ID={}: {} {} ({:?}, {:?})",
-                            player.itsf_id,
-                            player.first_name,
-                            player.last_name,
-                            player.category,
-                            player.country_code
+                            player.itsf_id, player.first_name, player.last_name, player.category, player.country_code
                         ));
                         db.add_player(player);
                     }

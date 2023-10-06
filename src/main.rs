@@ -53,8 +53,7 @@ impl AppState {
     fn get_download(
         this: &web::Data<AppState>,
     ) -> Result<MutexGuard<Weak<background::BackgroundOperationProgress>>, Error> {
-        this
-            .download
+        this.download
             .lock()
             .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))
     }

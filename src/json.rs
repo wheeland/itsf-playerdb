@@ -9,11 +9,9 @@ struct JsonErr<T: serde::Serialize> {
 }
 
 pub fn ok<T: serde::Serialize>(data: T) -> impl serde::Serialize {
-    
     JsonOk { data }
 }
 
 pub fn err<T: serde::Serialize>(error: T) -> impl serde::Serialize {
-    
     JsonErr { error }
 }
