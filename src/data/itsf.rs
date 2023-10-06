@@ -21,8 +21,8 @@ impl PlayerCategory {
             _ => Err(format!("invalid category: '{}'", category)),
         }
     }
-    pub fn to_str(&self) -> &'static str {
-        match *self {
+    pub fn to_str(self) -> &'static str {
+        match self {
             Self::Men => "MEN",
             Self::Women => "WOMEN",
             Self::JuniorMale => "JUNIOR MALE",

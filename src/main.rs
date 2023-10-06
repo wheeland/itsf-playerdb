@@ -11,7 +11,7 @@ use rustls::ServerConfig;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
 use std::sync::{Mutex, MutexGuard, Weak};
 
 mod background;
@@ -26,7 +26,7 @@ fn load_users_file() -> HashMap<String, String> {
     let mut ret = HashMap::new();
     for line in BufReader::new(file).lines() {
         let line = line.expect("Failed to parse users file");
-        let parts: Vec<&str> = line.split(":").collect();
+        let parts: Vec<&str> = line.split(':').collect();
         assert!(parts.len() == 2, "Invalid users file");
         ret.insert(String::from(parts[0]), String::from(parts[1]));
     }
@@ -40,7 +40,7 @@ fn is_authorized(auth: BasicAuth) -> bool {
     let user_id = auth.user_id().to_string();
     let passwords = auth.password().zip(USERS.get(&user_id));
     match passwords {
-        Some((pw1, pw2)) => &pw1 == &pw2,
+        Some((pw1, pw2)) => pw1 == pw2,
         None => false,
     }
 }
@@ -53,10 +53,10 @@ impl AppState {
     fn get_download(
         this: &web::Data<AppState>,
     ) -> Result<MutexGuard<Weak<background::BackgroundOperationProgress>>, Error> {
-        Ok(this
+        this
             .download
             .lock()
-            .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))?)
+            .map_err(|_| actix_web::error::ErrorInternalServerError("internal lock"))
     }
 }
 
@@ -123,16 +123,19 @@ async fn list_players(data: web::Data<AppState>) -> Result<HttpResponse, Error> 
         pub first_name: String,
         pub last_name: String,
     }
-    
+
     let ids = data.data.get_player_ids();
-    let players: Vec<PlayerData> = ids.iter().map(|itsf_lic| {
-        let player = data.data.get_player(*itsf_lic).unwrap();
-        PlayerData {
-            itsf_lic: *itsf_lic,
-            first_name: player.first_name,
-            last_name: player.last_name,
-        }
-    }).collect();
+    let players: Vec<PlayerData> = ids
+        .iter()
+        .map(|itsf_lic| {
+            let player = data.data.get_player(*itsf_lic).unwrap();
+            PlayerData {
+                itsf_lic: *itsf_lic,
+                first_name: player.first_name,
+                last_name: player.last_name,
+            }
+        })
+        .collect();
 
     Ok(HttpResponse::Ok().json(json::ok(players)))
 }
@@ -173,7 +176,7 @@ async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Erro
 
 fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
     let mut download = AppState::get_download(&data)?;
-    if let Some(_) = download.upgrade() {
+    if download.upgrade().is_some() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
@@ -202,7 +205,7 @@ struct DownloadParams {
 impl DownloadParams {
     fn parse_year(&self) -> Option<i32> {
         let min_year = 2010;
-        let curr_year = chrono::Utc::today().naive_local().year();
+        let curr_year = chrono::Utc::now().naive_local().year();
         match &self.year {
             Some(year_str) => year_str.parse::<i32>().ok().and_then(|year| {
                 if year >= min_year && year <= curr_year {
@@ -220,7 +223,7 @@ impl DownloadParams {
 async fn download_itsf_single(
     data: web::Data<AppState>,
     params: web::Query<DownloadParams>,
-    auth: BasicAuth
+    auth: BasicAuth,
 ) -> Result<HttpResponse, Error> {
     if !is_authorized(auth) {
         return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
@@ -239,7 +242,7 @@ async fn download_all_itsf(data: web::Data<AppState>, auth: BasicAuth) -> Result
         return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
     }
 
-    let curr_year = chrono::Utc::today().naive_local().year();
+    let curr_year = chrono::Utc::now().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
     download_itsf(data, years, max_rank)
@@ -247,7 +250,7 @@ async fn download_all_itsf(data: web::Data<AppState>, auth: BasicAuth) -> Result
 
 fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
     let mut download = AppState::get_download(&data)?;
-    if let Some(_) = download.upgrade() {
+    if download.upgrade().is_some() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
@@ -279,7 +282,7 @@ async fn download_dtfb_all(data: web::Data<AppState>, auth: BasicAuth) -> Result
         return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
     }
 
-    let curr_year = chrono::Utc::today().naive_local().year();
+    let curr_year = chrono::Utc::now().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
     download_dtfb(data, years, max_rank)
@@ -292,7 +295,11 @@ struct AddCommentInfo {
 }
 
 #[actix_web::post("/add_comment")]
-async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommentInfo>, auth: BasicAuth) -> Result<HttpResponse, Error> {
+async fn add_player_comment(
+    data: web::Data<AppState>,
+    info: web::Json<AddCommentInfo>,
+    auth: BasicAuth,
+) -> Result<HttpResponse, Error> {
     if !is_authorized(auth) {
         return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
     }
@@ -303,21 +310,28 @@ async fn add_player_comment(data: web::Data<AppState>, info: web::Json<AddCommen
 
 fn get_rustls_config() -> Option<ServerConfig> {
     use rustls::{Certificate, PrivateKey};
-    use rustls_pemfile::{Item, read_all};
+    use rustls_pemfile::{read_all, Item};
 
     std::env::var("CERT_PEM").ok().map(|pem| {
         let pem = File::open(pem).expect("PEM file not found");
         let mut pem = BufReader::new(pem);
         let pem_sections = read_all(&mut pem).expect("Failed to parse PEM file");
 
-        let certs: Vec<Certificate> = pem_sections.iter().filter_map(|item| match item {
-            Item::X509Certificate(cert) => Some(Certificate(cert.clone())),
-            _ => None,
-        }).collect();
-        let key = pem_sections.iter().filter_map(|item| match item {
-            Item::RSAKey(key) => Some(PrivateKey(key.clone())),
-            _ => None,
-        }).next().expect("no RSA key in PEM file");
+        let certs: Vec<Certificate> = pem_sections
+            .iter()
+            .filter_map(|item| match item {
+                Item::X509Certificate(cert) => Some(Certificate(cert.clone())),
+                _ => None,
+            })
+            .collect();
+        let key = pem_sections
+            .iter()
+            .filter_map(|item| match item {
+                Item::RSAKey(key) => Some(PrivateKey(key.clone())),
+                _ => None,
+            })
+            .next()
+            .expect("no RSA key in PEM file");
 
         ServerConfig::builder()
             .with_safe_defaults()
@@ -359,14 +373,16 @@ async fn main() -> std::io::Result<()> {
             .service(add_player_comment)
             .service(actix_files::Files::new("", &html_path).index_file("start.html"))
     });
-    
+
     if let Some(server_config) = get_rustls_config() {
         log::info!("Starting HTTPS server at http://localhost:{}", port);
-        server = server.bind_rustls(("0.0.0.0", port), server_config).expect("Failed to start actix with rustls");
-    }  else {
+        server = server
+            .bind_rustls(("0.0.0.0", port), server_config)
+            .expect("Failed to start actix with rustls");
+    } else {
         log::info!("Starting HTTP server at http://localhost:{}", port);
         server = server.bind(("0.0.0.0", port))?;
     }
-    
+
     server.run().await
 }
