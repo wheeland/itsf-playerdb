@@ -32,19 +32,19 @@ fn to_normalcase(word: &str) -> String {
 }
 
 fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
-    let nomdujoueur = get_div_with_class(&html, "nomdujoueur");
+    let nomdujoueur = get_div_with_class(html, "nomdujoueur");
     let nomdujoueur = nomdujoueur.first().ok_or("can't find div nomdujoueur")?;
     let name = nomdujoueur.text().next().ok_or("can't find text in nomdujoueur div")?;
 
     let last_name = name
-        .split(" ")
+        .split(' ')
         .filter(|word| !word.is_empty() && is_uppercase(word))
         .map(to_normalcase)
         .collect::<Vec<String>>()
         .join(" ");
 
     let first_name = name
-        .split(" ")
+        .split(' ')
         .filter(|word| !word.is_empty() && !is_uppercase(word))
         .collect::<Vec<&str>>()
         .join(" ");
@@ -55,15 +55,15 @@ fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
         .next()
         .ok_or("can't find country code")?;
     let country_code = country_code.text().next().ok_or("can't find country code text")?;
-    if !country_code.starts_with("(") || !country_code.ends_with(")") {
+    if !country_code.starts_with('(') || !country_code.ends_with(')') {
         return Err(format!("invalid country code ({:?})", country_code));
     }
     let country_code = country_code[1..]
-        .split(" ")
+        .split(' ')
         .next()
         .ok_or(format!("invalid country code ({:?})", country_code))?;
 
-    let contenu_typeinfojoueur = get_div_with_class(&html, "contenu_typeinfojoueur");
+    let contenu_typeinfojoueur = get_div_with_class(html, "contenu_typeinfojoueur");
     if contenu_typeinfojoueur.len() < 2 {
         return Err(format!(
             "invalid number of contenu_typeinfojoueur ({})",
@@ -71,8 +71,8 @@ fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
         ));
     }
 
-    let contenu_typeinfojoueur_even = get_div_with_class(&html, "contenu_typeinfojoueur even");
-    if contenu_typeinfojoueur_even.len() < 1 {
+    let contenu_typeinfojoueur_even = get_div_with_class(html, "contenu_typeinfojoueur even");
+    if contenu_typeinfojoueur_even.is_empty() {
         return Err(format!(
             "invalid number of contenu_typeinfojoueur ({})",
             contenu_typeinfojoueur_even.len()
@@ -91,11 +91,11 @@ fn parse_player_info_from(itsf_id: i32, html: &Html) -> Result<Player, String> {
 
     Ok(Player {
         itsf_id,
-        first_name: first_name.into(),
-        last_name: last_name.into(),
+        first_name: first_name,
+        last_name: last_name,
         birth_year,
         country_code: Some(country_code.into()),
-        category: category.into(),
+        category: category,
         itsf_rankings: Vec::new(),
         dtfb_id: None,
         dtfb_championship_results: Vec::new(),

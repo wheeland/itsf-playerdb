@@ -1,11 +1,10 @@
+use std::fs::File;
+use std::io::{Cursor, Read, Write};
 use std::{
     cell::RefCell,
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use std::fs::File;
-use std::io::{Cursor, Read, Write};
-use chrono::TimeZone;
 use zip::{CompressionMethod, ZipWriter};
 
 mod db;
@@ -90,7 +89,7 @@ impl DatabaseRef {
             players,
         };
 
-        let path_info = std::fs::metadata(image_directory).expect(&format!("Can't open {}", image_directory));
+        let path_info = std::fs::metadata(image_directory).unwrap_or_else(|_| panic!("Can't open {}", image_directory));
         assert!(path_info.is_dir(), "Not a directory: {}", image_directory);
 
         Self {
@@ -102,12 +101,12 @@ impl DatabaseRef {
 
     pub fn get_player(&self, itsf_id: i32) -> Option<Player> {
         let inner = self.inner.lock().unwrap();
-        inner.players.get(&itsf_id).map(|player| player.clone())
+        inner.players.get(&itsf_id).cloned()
     }
 
     pub fn get_player_ids(&self) -> Vec<i32> {
         let inner = self.inner.lock().unwrap();
-        inner.players.keys().map(|id| *id).collect()
+        inner.players.keys().copied().collect()
     }
 
     pub fn add_player(&self, player: Player) {
@@ -118,7 +117,7 @@ impl DatabaseRef {
 
     pub fn get_player_image(&self, itsf_id: i32) -> Option<PlayerImage> {
         let path = format!("{}/{}.jpg", self.image_directory, itsf_id);
-        std::fs::read(&path).ok().map(|image_data| PlayerImage {
+        std::fs::read(path).ok().map(|image_data| PlayerImage {
             itsf_id,
             image_data,
             image_format: String::from("jpg"),
@@ -127,7 +126,7 @@ impl DatabaseRef {
 
     pub fn set_player_image(&self, player_image: PlayerImage) {
         let path = format!("{}/{}.jpg", self.image_directory, player_image.itsf_id);
-        std::fs::write(&path, player_image.image_data).expect(&format!("Failed to write {}", path));
+        std::fs::write(&path, player_image.image_data).unwrap_or_else(|_| panic!("Failed to write {}", path));
     }
 
     fn modify_player<F>(&self, itsf_id: i32, f: F)
@@ -147,7 +146,7 @@ impl DatabaseRef {
 
     pub fn add_player_itsf_ranking(&self, itsf_id: i32, ranking: itsf::Ranking) {
         self.modify_player(itsf_id, |player| {
-            player.itsf_rankings.retain(|r| !ranking.matches(&r));
+            player.itsf_rankings.retain(|r| !ranking.matches(r));
             player.itsf_rankings.push(ranking);
         });
     }
@@ -160,14 +159,14 @@ impl DatabaseRef {
 
     pub fn add_player_dtfb_championship_result(&self, itsf_id: i32, result: dtfb::NationalChampionshipResult) {
         self.modify_player(itsf_id, |player| {
-            player.dtfb_championship_results.retain(|r| !result.matches(&r));
+            player.dtfb_championship_results.retain(|r| !result.matches(r));
             player.dtfb_championship_results.push(result);
         });
     }
 
     pub fn add_player_dtfb_ranking(&self, itsf_id: i32, ranking: dtfb::NationalRanking) {
         self.modify_player(itsf_id, |player| {
-            player.dtfb_national_rankings.retain(|r| !ranking.matches(&r));
+            player.dtfb_national_rankings.retain(|r| !ranking.matches(r));
             player.dtfb_national_rankings.push(ranking);
         });
     }
@@ -192,10 +191,10 @@ impl DatabaseRef {
         {
             let mut zip = ZipWriter::new(Cursor::new(&mut buffer));
             add_zip_file(&mut zip, CompressionMethod::Deflated, &self.database_path)?;
-    
+
             let options = zip::write::FileOptions::default().compression_method(CompressionMethod::Stored);
             zip.add_directory("images", options).map_err(|_| ())?;
-    
+
             let dir = std::fs::read_dir(&self.image_directory).map_err(|_| ())?;
             for file in dir {
                 let file = file.map_err(|_| ())?.path();
@@ -203,7 +202,7 @@ impl DatabaseRef {
                 add_zip_file(&mut zip, CompressionMethod::Deflated, file)?;
             }
         }
-    
+
         Ok(buffer)
     }
 }

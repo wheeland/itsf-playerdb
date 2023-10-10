@@ -34,7 +34,7 @@ async fn download_itsf_players(
             })
             .collect();
     }
-    if missing_players.len() > 0 {
+    if !missing_players.is_empty() {
         progress.set_progress(1, missing_players.len() + 1);
         progress.log(format!(
             "[ITSF] Downloading {} ITSF player profiles",
@@ -43,7 +43,7 @@ async fn download_itsf_players(
 
         // query players in sets of N, to hide ITSF server latency
         const MAX_CONCURRENT: usize = 5;
-        while missing_players.len() > 0 {
+        while !missing_players.is_empty() {
             let mut player_futures = Vec::new();
             let mut image_futures = Vec::new();
             let count = missing_players.len().min(MAX_CONCURRENT);
@@ -58,11 +58,7 @@ async fn download_itsf_players(
                     Ok(player) => {
                         progress.log(format!(
                             "[ITSF] .. downloaded player info for ID={}: {} {} ({:?}, {:?})",
-                            player.itsf_id,
-                            player.first_name,
-                            player.last_name,
-                            itsf::PlayerCategory::try_from(player.category).unwrap(),
-                            player.country_code
+                            player.itsf_id, player.first_name, player.last_name, player.category, player.country_code
                         ));
                         db.add_player(player);
                     }
@@ -79,7 +75,7 @@ async fn download_itsf_players(
             }
         }
 
-        progress.log(format!("[ITSF] Done"));
+        progress.log("[ITSF] Done".to_string());
     }
 
     Ok(())
@@ -173,7 +169,7 @@ async fn do_dtfb_rankings_download(
 
     // download DTFB player profiles for every single player
     const MAX_CONCURRENT: usize = 5;
-    while dtfb_player_ids.len() > 0 {
+    while !dtfb_player_ids.is_empty() {
         let mut player_futures = Vec::new();
         let count = dtfb_player_ids.len().min(MAX_CONCURRENT);
         for _ in 0..count {
@@ -205,8 +201,8 @@ async fn do_dtfb_rankings_download(
                 dtfb::NationalChampionshipResult {
                     year: result.year,
                     place: result.place,
-                    category: result.category.into(),
-                    class: result.class.into(),
+                    category: result.category,
+                    class: result.class,
                 },
             );
         }
@@ -217,7 +213,7 @@ async fn do_dtfb_rankings_download(
                 dtfb::NationalRanking {
                     year: ranking.year,
                     place: ranking.place,
-                    category: ranking.category.into(),
+                    category: ranking.category,
                 },
             );
         }
@@ -227,7 +223,7 @@ async fn do_dtfb_rankings_download(
         }
     }
 
-    progress.log(format!("[DTFB] done"));
+    progress.log("[DTFB] done".to_string());
 
     Ok(())
 }
