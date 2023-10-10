@@ -45,7 +45,8 @@
         function postUpdate(url) {
             var max_rank = document.getElementById("max_rank");
             var year = document.getElementById("year");
-            let query = "?max_rank=" + max_rank.value + "&year=" + year.value;
+            var force = document.getElementById("force");
+            let query = "?max_rank=" + max_rank.value + "&year=" + year.value + "&force=" + force.checked;
             var xhr = new XMLHttpRequest();
             xhr.open("POST", url + query, true);
             xhr.setRequestHeader("Accept", "application/json");
@@ -82,6 +83,11 @@
             <p>
                 <label for="year">Year to update:</label>
                 <input type="number" id="year" name="fname">
+            </p>
+
+            <p>
+                <label for="force">force re-download of all players</label>
+                <input type="checkbox" id="force" name="force">
             </p>
 
             <p> <button onclick="postUpdate('/download_dtfb')"> Update DTFB players </button> </p>

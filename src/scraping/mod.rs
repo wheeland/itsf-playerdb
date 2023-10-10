@@ -19,15 +19,21 @@ async fn download_itsf_players(
     db: &DatabaseRef,
     player_itsf_ids: &[i32],
     progress: Arc<BackgroundOperationProgress>,
+    force: bool,
 ) -> Result<(), String> {
-    let mut missing_players: Vec<i32> = player_itsf_ids
-        .into_iter()
-        .filter_map(|itsf_lic| match db.get_player(*itsf_lic) {
-            None => Some(*itsf_lic),
-            Some(_) => None,
-        })
-        .collect();
+    let mut missing_players: Vec<i32>;
 
+    if force {
+        missing_players = player_itsf_ids.to_vec();
+    } else {
+        missing_players = player_itsf_ids
+            .iter()
+            .filter_map(|itsf_lic| match db.get_player(*itsf_lic) {
+                None => Some(*itsf_lic),
+                Some(_) => None,
+            })
+            .collect();
+    }
     if missing_players.len() > 0 {
         progress.set_progress(1, missing_players.len() + 1);
         progress.log(format!(
@@ -86,6 +92,7 @@ async fn do_itsf_rankings_downloads(
     classes: Vec<itsf::RankingClass>,
     progress: Arc<BackgroundOperationProgress>,
     max_rank: usize,
+    force: bool,
 ) -> Result<(), String> {
     for year in years {
         for category in categories.iter().cloned() {
@@ -97,7 +104,7 @@ async fn do_itsf_rankings_downloads(
                 let rankings = itsf_rankings::download(year, category, class, max_rank).await?;
 
                 let itsf_player_ids: Vec<i32> = rankings.iter().map(|entry| entry.1).collect();
-                download_itsf_players(db, &itsf_player_ids, progress.clone()).await?;
+                download_itsf_players(db, &itsf_player_ids, progress.clone(), force).await?;
 
                 for placement in rankings {
                     db.add_player_itsf_ranking(
@@ -122,10 +129,11 @@ pub fn start_itsf_rankings_download(
     categories: Vec<itsf::RankingCategory>,
     classes: Vec<itsf::RankingClass>,
     max_rank: usize,
+    force: bool,
 ) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("ITSF Rankings Download", 1);
     tokio::spawn(async move {
-        match do_itsf_rankings_downloads(&db, years, categories, classes, arc.clone(), max_rank).await {
+        match do_itsf_rankings_downloads(&db, years, categories, classes, arc.clone(), max_rank, force).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to download ITSF rankings: {}", err),
         };
@@ -139,6 +147,7 @@ async fn do_dtfb_rankings_download(
     seasons: Vec<i32>,
     progress: Arc<BackgroundOperationProgress>,
     max_rank: usize,
+    force: bool,
 ) -> Result<(), String> {
     progress.log(format!(
         "[DTFB] starting download of DTFB rankings for seasons {:?}",
@@ -184,7 +193,7 @@ async fn do_dtfb_rankings_download(
     }
 
     let itsf_player_ids: Vec<i32> = dtfb_players.iter().map(|player| player.itsf_id).collect();
-    download_itsf_players(&db, &itsf_player_ids, progress.clone()).await?;
+    download_itsf_players(&db, &itsf_player_ids, progress.clone(), force).await?;
 
     // add DTFB player data to DB
     for dtfb_player in dtfb_players {
@@ -227,10 +236,11 @@ pub fn start_dtfb_rankings_download(
     db: DatabaseRef,
     seasons: Vec<i32>,
     max_rank: usize,
+    force: bool,
 ) -> Weak<BackgroundOperationProgress> {
     let (arc, weak) = BackgroundOperationProgress::new("DTFB Rankings Download", 1);
     tokio::spawn(async move {
-        match do_dtfb_rankings_download(db, seasons, arc.clone(), max_rank).await {
+        match do_dtfb_rankings_download(db, seasons, arc.clone(), max_rank, force).await {
             Ok(_) => {}
             Err(err) => log::error!("failed to download DTFB rankings: {}", err),
         };
