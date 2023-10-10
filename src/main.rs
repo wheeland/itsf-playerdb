@@ -173,7 +173,12 @@ async fn download_status(data: web::Data<AppState>) -> Result<HttpResponse, Erro
     Ok(HttpResponse::Ok().json(json::ok(status)))
 }
 
-fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
+fn download_itsf(
+    data: web::Data<AppState>,
+    years: Vec<i32>,
+    max_rank: usize,
+    force: bool,
+) -> Result<HttpResponse, Error> {
     let mut download = AppState::get_download(&data)?;
     if download.upgrade().is_some() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
@@ -190,7 +195,7 @@ fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) ->
         itsf::RankingClass::Doubles,
         itsf::RankingClass::Combined,
     ];
-    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes, max_rank);
+    *download = scraping::start_itsf_rankings_download(data.data.clone(), years, categories, classes, max_rank, force);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -199,6 +204,7 @@ fn download_itsf(data: web::Data<AppState>, years: Vec<i32>, max_rank: usize) ->
 struct DownloadParams {
     year: Option<String>,
     max_rank: Option<usize>,
+    force: Option<String>,
 }
 
 impl DownloadParams {
@@ -216,6 +222,13 @@ impl DownloadParams {
             None => Some(curr_year),
         }
     }
+
+    fn parse_force(&self) -> bool {
+        match &self.force {
+            Some(force_str) => force_str == "true",
+            None => false,
+        }
+    }
 }
 
 #[actix_web::post("/download_itsf")]
@@ -228,9 +241,10 @@ async fn download_itsf_single(
         return Ok(HttpResponse::Forbidden().json(json::err("not authorized")));
     }
 
+    let force = params.parse_force();
     let max_rank = params.max_rank.unwrap_or(1000);
     match params.parse_year() {
-        Some(year) => download_itsf(data, vec![year], max_rank),
+        Some(year) => download_itsf(data, vec![year], max_rank, force),
         None => Ok(HttpResponse::BadRequest().json(json::err("invalid year"))),
     }
 }
@@ -244,16 +258,21 @@ async fn download_all_itsf(data: web::Data<AppState>, auth: BasicAuth) -> Result
     let curr_year = chrono::Utc::now().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
-    download_itsf(data, years, max_rank)
+    download_itsf(data, years, max_rank, false)
 }
 
-fn download_dtfb(data: web::Data<AppState>, seasons: Vec<i32>, max_rank: usize) -> Result<HttpResponse, Error> {
+fn download_dtfb(
+    data: web::Data<AppState>,
+    seasons: Vec<i32>,
+    max_rank: usize,
+    force: bool,
+) -> Result<HttpResponse, Error> {
     let mut download = AppState::get_download(&data)?;
     if download.upgrade().is_some() {
         return Ok(HttpResponse::BadRequest().json(json::err("Ranking query still in progress")));
     }
 
-    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons, max_rank);
+    *download = scraping::start_dtfb_rankings_download(data.data.clone(), seasons, max_rank, force);
 
     Ok(HttpResponse::Ok().json(json::ok("Started download")))
 }
@@ -269,8 +288,9 @@ async fn download_dtfb_single(
     }
 
     let max_rank = params.max_rank.unwrap_or(1000);
+    let force = params.parse_force();
     match params.parse_year() {
-        Some(year) => download_dtfb(data, vec![year], max_rank),
+        Some(year) => download_dtfb(data, vec![year], max_rank, force),
         None => Ok(HttpResponse::BadRequest().json(json::err("invalid year"))),
     }
 }
@@ -284,7 +304,7 @@ async fn download_dtfb_all(data: web::Data<AppState>, auth: BasicAuth) -> Result
     let curr_year = chrono::Utc::now().naive_local().year();
     let years = (2010..curr_year + 1).collect();
     let max_rank = 1000;
-    download_dtfb(data, years, max_rank)
+    download_dtfb(data, years, max_rank, false)
 }
 
 #[derive(Deserialize)]
