@@ -5,8 +5,6 @@ use serde::Serialize;
 
 use crate::schema::*;
 
-use super::PlayerImage;
-
 #[derive(Queryable, Insertable, AsChangeset)]
 #[diesel(table_name = players)]
 struct DbPlayer {

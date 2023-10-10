@@ -6,8 +6,8 @@ fn get_player_from_div(div: &ElementRef) -> Result<(i32, i32), &'static str> {
     let id = div.value().attr("id").ok_or("no id attr")?;
     let onclick = div.value().attr("onclick").ok_or("no onclick attr")?;
 
-    let place = if id.starts_with("place") {
-        id[5..].parse::<i32>().map_err(|_| "can't parse place attr")?
+    let place = if let Some(striped_place) = id.strip_prefix("place") {
+        striped_place.parse::<i32>().map_err(|_| "can't parse place attr")?
     } else {
         Err("id attr has no place")?
     };
@@ -17,7 +17,7 @@ fn get_player_from_div(div: &ElementRef) -> Result<(i32, i32), &'static str> {
         parts.next().ok_or("onclick doesn't contain player link")?;
         let license = parts.next().ok_or("onclick doesn't contain player link")?;
         license
-            .split("&")
+            .split('&')
             .next()
             .ok_or("doesn't contain player link")?
             .parse::<i32>()

@@ -40,7 +40,7 @@ impl BackgroundOperationProgress {
 
     pub fn has_finished(&self) -> bool {
         let progress = self.get_progress();
-        return progress.0 >= progress.1;
+        progress.0 >= progress.1
     }
 
     pub fn new(title: &str, max: usize) -> (Arc<BackgroundOperationProgress>, Weak<BackgroundOperationProgress>) {

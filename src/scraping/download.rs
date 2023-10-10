@@ -16,7 +16,7 @@ async fn get(url: &str, headers: &[(&str, &str)]) -> Result<String, reqwest::Err
 }
 
 pub async fn download(url: &str, headers: &[(&str, &str)]) -> Result<String, String> {
-    Ok(get(url, headers).await.map_err(|err| err.to_string())?)
+    get(url, headers).await.map_err(|err| err.to_string())
 }
 
 pub async fn download_html(url: &str) -> Result<Html, String> {
